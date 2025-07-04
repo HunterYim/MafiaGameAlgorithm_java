@@ -118,6 +118,31 @@ public abstract class Job {
         }
         return true;
     }
+    
+    /**
+     * 밤 능력 처리의 우선순위 반환
+     * 숫자가 높을수록 먼저 처리
+     * 
+     * (예: 방해/방어 5, 치료 4, 정보수집 3, 공격 2, 기타 1)
+     * 
+     * @return 능력 처리 우선순위 정수
+     */
+    public int getNightActionPriority() {
+        return 1; // 대부분의 직업은 기본 우선순위로 설정
+    }
+
+    /**
+     * 밤 능력의 결과를 실제 게임 상태에 적용
+     * GameManager가 정해진 순서에 따라 이 메서드를 호출하며, 세부 로직은 각 직업 클래스가 구현
+     *
+     * @param gameManager 게임 매니저 (공개 공지 추가, 다른 플레이어 상태 확인 등)
+     * @param user        능력을 사용한 플레이어
+     * @param target      능력의 대상이 된 플레이어
+     */
+    public void applyNightEffect(GameManager gameManager, Player user, Player target) {
+        // 능력이 없는 직업이나, 적용할 효과가 없는 직업은 아무것도 하지 않음
+        // 필요한 직업 클래스에서 메서드 재정의
+    }
 
     /**
      * 추상 메서드 -> 각 직업 클래스는 이 메서드 구현

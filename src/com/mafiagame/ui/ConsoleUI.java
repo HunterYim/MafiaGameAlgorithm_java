@@ -1,0 +1,80 @@
+package com.mafiagame.ui;
+
+import com.mafiagame.logic.game.Player;
+import java.util.List;
+import java.util.Scanner;
+
+/**
+ * GameUI 인터페이스의 콘솔(텍스트) 기반 구현체
+ * 사용자의 입력을 받고, 콘솔에 게임 상태를 출력하는 모든 역할 담당
+ */
+public class ConsoleUI implements GameUI {
+
+    private final Scanner scanner = new Scanner(System.in);
+
+    @Override
+    public void displayPublicMessage(String message) {
+        System.out.println("[전체 공지] " + message);
+    }
+
+    @Override
+    public void displayPrivateMessage(Player player, String message) {
+        if (player != null) {
+            System.out.println("[" + player.getName() + "님께] " + message);
+        } else {
+            // actor가 null인 경우도 공지처럼 처리
+            System.out.println(message);
+        }
+    }
+
+    @Override
+    public void clearScreen() {
+        for (int i = 0; i < 30; i++) {
+            System.out.println();
+        }
+        System.out.println("--- (화면이 전환되었습니다) ---");
+    }
+
+    @Override
+    public void waitForPlayerConfirmation(Player actor, String prompt) {
+        if (actor != null) {
+            System.out.print("[" + actor.getName() + "님] " + prompt);
+        } else {
+            System.out.print(prompt);
+        }
+        scanner.nextLine();
+    }
+
+    @Override
+    public Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets) {
+        displayPrivateMessage(actor, prompt);
+        
+        // 선택지 출력
+        for (int i = 0; i < targets.size(); i++) {
+            // 메시지를 actor에게만 보여주기 위해 displayPrivateMessage 사용
+            displayPrivateMessage(actor, String.format("%d. %s", i + 1, targets.get(i).getName()));
+        }
+
+        while (true) {
+            System.out.print("[" + actor.getName() + "님] 번호를 입력하세요: ");
+            try {
+                int choice = Integer.parseInt(scanner.nextLine().trim()) - 1;
+                if (choice >= 0 && choice < targets.size()) {
+                    return targets.get(choice); // 유효한 선택, 선택된 Player 객체 반환
+                } else {
+                    displayPrivateMessage(actor, "잘못된 번호입니다. 다시 입력해주세요.");
+                }
+            } catch (NumberFormatException e) {
+                displayPrivateMessage(actor, "숫자로만 입력해주세요.");
+            }
+        }
+    }
+    
+    /**
+     * 게임이 완전히 종료될 때 Scanner 자원을 해제하기 위한 메서드
+     * MainGame에서 호출 가능
+     */
+    public void close() {
+        scanner.close();
+    }
+}
