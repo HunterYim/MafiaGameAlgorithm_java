@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
-import java.util.Comparator;
 
 /**
  * 마피아 게임의 전체 진행을 관리하는 클래스
@@ -355,7 +354,7 @@ public class GameManager {
 		this.isGameOver = false;
 
 		while (!isGameOver) {
-			ui.displayPublicMessage("\n--- " + (dayCount + 1) + "일차 " + getPhaseName(currentPhase) + " 시작 ---");
+			ui.displayPublicMessage("\n--- " + (dayCount) + "일차 시작 (" + getPhaseName(currentPhase) + ") ---");
 			switch (currentPhase) {
 			case NIGHT_JOB_CONFIRM_ABILITY:
 				processNightJobConfirmAbilityPhase();
@@ -481,7 +480,7 @@ public class GameManager {
 			
 			handlePlayerNightActionTurn(currentPlayer);
 
-			ui.waitForPlayerConfirmation(currentPlayer, "확인 후 Enter 키를 누르고 다음 사람에게 넘기세요.");
+			ui.waitForPlayerConfirmation(currentPlayer, "Enter 키를 누르고 다음 사람에게 넘기세요.");
             ui.clearScreen();
         }
         applyNightActionsAndResults();
@@ -516,7 +515,7 @@ public class GameManager {
     private void handlePlayerNightActionTurn(Player currentPlayer) {
         if (currentPlayer.getJob().hasNightAbility()) {
             if (currentPlayer.getJob().canUseAbility(currentPlayer, this.dayCount, this)) {
-                currentPlayer.performNightAction(this);
+            	currentPlayer.performNightAction(this);
             } else {
                 String cantUseMessage = currentPlayer.getName() + "님은 이번 밤에 능력을 사용할 수 없습니다.";
                 if (currentPlayer.getJob().isOneTimeAbility() && currentPlayer.getJob().hasUsedOneTimeAbility()) {
@@ -531,40 +530,71 @@ public class GameManager {
         }
     }
 	
-    /*
-     * 밤 동안 사용된 능력들의 결과를 종합하고 플레이어 상태 업데이트
-     * 
-     * 1. 밤 동안 사용된 능력들을 우선순위에 따라 정렬
-     * 2. 정렬된 순서대로 각 직업의 `applyNightEffect`를 호출하여 로직 처리 위임
+    /**
+     * 밤 동안 사용된 능력들의 결과를 종합하고 플레이어 상태를 업데이트
      */
     private void applyNightActionsAndResults() {
-        // 1. 밤 행동 기록(nightAbilityTargets)을 우선순위 순으로 정렬
+        // 1. 밤 행동 기록을 리스트로 변환
         List<Map.Entry<Player, Player>> sortedActions = new ArrayList<>(nightAbilityTargets.entrySet());
         
-        // 우선순위가 높은 순서(내림차순)로 정렬
-        sortedActions.sort(Comparator.comparingInt(entry -> entry.getKey().getJob().getNightActionPriority()).reversed());
+        // 2. 우선순위가 높은 순서(내림차순)로 정렬
+        sortedActions.sort((entry1, entry2) -> {
+            int priority1 = entry1.getKey().getJob().getNightActionPriority();
+            int priority2 = entry2.getKey().getJob().getNightActionPriority();
+            return Integer.compare(priority2, priority1);
+        });
 
-        // 2. 정렬된 순서대로 각 직업의 효과 적용 메서드 호출
+        // 3. 정렬된 순서대로 각 직업의 효과 적용 메서드 호출
         for (Map.Entry<Player, Player> action : sortedActions) {
             Player user = action.getKey();
             Player target = action.getValue();
             
             // 능력을 사용한 플레이어가 그 사이 다른 능력에 의해 죽지 않았는지 확인
-            if (user.isAlive()) {
+            if (user != null && user.isAlive()) {
                  user.getJob().applyNightEffect(this, user, target);
             }
         }
 
-        // 3. 밤 동안의 모든 행동이 적용된 후, 사망자를 최종적으로 공지 목록에 추가
+        // 4. 모든 효과가 적용된 후, 이번 밤에 죽은 플레이어 목록을 생성
+        List<Player> diedThisNight = new ArrayList<>();
         for (Player player : players) {
-            // Player의 isAlive가 false가 되었지만, 아직 사망 공지가 되지 않은 경우를 찾음
             if (!player.isAlive() && !isDeathAnnounced(player)) {
-                addPublicAnnouncement(player.getName() + "님이 밤 사이 사망했습니다.");
-                // 사망 공지 플래그 등을 추가하여 중복 공지를 막을 수 있음 (현재는 생략)
+                diedThisNight.add(player);
             }
+        }
+
+        // 5. 도굴꾼 능력 처리
+        handleGraveRobberAbility(diedThisNight);
+        
+        // 6. 사망자 최종 공지
+        for(Player deadPlayer : diedThisNight){
+             addPublicAnnouncement(deadPlayer.getName() + "님이 밤 사이 사망했습니다.");
         }
         
         nightAbilityTargets.clear();
+    }
+
+    /**
+     * 첫날 밤, 도굴꾼의 직업 훔치기 능력 처리
+     */
+    private void handleGraveRobberAbility(List<Player> diedThisNight) {
+        // 도굴꾼 능력은 첫날 밤(dayCount == 1)에만 발동
+        if (dayCount != 1) return;
+
+        Player graveRobber = getPlayerByJob(GraveRobber.class);
+        // 도굴꾼이 없거나, 죽었거나, 첫날 밤에 아무도 죽지 않았다면 발동 안함
+        if (graveRobber == null || !graveRobber.isAlive() || diedThisNight.isEmpty()) return;
+
+        // 공격으로 죽은 첫 번째 플레이어를 대상으로 함
+        Player firstDead = diedThisNight.get(0);
+        
+        // 직업을 훔침
+        Job stolenJob = firstDead.getJob();
+        graveRobber.setJob(stolenJob);
+        
+        // 도굴꾼에게 알림
+        String message = "당신은 " + firstDead.getName() + "님의 직업인 [" + stolenJob.getJobName() + "]을 훔쳤습니다!";
+        recordPrivateNightResult(graveRobber, message);
     }
     
     // 유틸리티 메서드: 사망 공지가 이미 되었는지 확인 (중복 공지 방지용)
@@ -820,20 +850,55 @@ public class GameManager {
 	}
 
 	/**
-	 * 낮 공개 결과 발표 페이즈
-	 */
-	private void processDayPublicAnnouncementPhase() {
-		ui.displayPublicMessage("낮이 밝았습니다. 밤 동안의 공개 결과입니다.");
-		if (publicAnnouncements.isEmpty()) {
-			ui.displayPublicMessage("밤 사이 아무 일도 일어나지 않았습니다.");
-		} else {
-			for (String announcement : publicAnnouncements) {
-				ui.displayPublicMessage(announcement);
-			}
-		}
-		publicAnnouncements.clear(); // 발표 후 초기화
-		executedPlayersToday.clear(); // 새 날이므로 초기화
-	}
+     * 낮 공개 결과 발표 페이즈
+     * 
+     * 1. 기자/장의사의 취재/부검 결과를 처리하여 공개 공지 목록에 추가
+     * 2. 밤 동안 발생한 사망자 및 기타 사건들 공지
+     */
+    private void processDayPublicAnnouncementPhase() {
+        // 기자와 장의사의 능력 결과를 여기서 처리
+        handleDelayedPublicAnnouncements();
+
+        ui.displayPublicMessage("낮이 밝았습니다. 밤 동안의 공개 결과입니다.");
+        if (publicAnnouncements.isEmpty()) {
+            ui.displayPublicMessage("밤 사이 아무 일도 일어나지 않았습니다.");
+        } else {
+            for (String announcement : publicAnnouncements) {
+                ui.displayPublicMessage(announcement);
+            }
+        }
+        publicAnnouncements.clear();
+        executedPlayersToday.clear();
+    }
+    
+    /**
+     * 기자, 장의사 등 밤에 사용했지만 다음 날 아침에 공개되는 능력들 처리
+     */
+    private void handleDelayedPublicAnnouncements() {
+        // nightAbilityTargets에 기록된 모든 밤 행동을 확인
+        for (Map.Entry<Player, Player> entry : nightAbilityTargets.entrySet()) {
+            Player user = entry.getKey();
+            Player target = entry.getValue();
+
+            // 기자의 취재 결과 처리
+            if (user.getJob() instanceof Reporter) {
+                if (user.isAlive()) {
+                    addPublicAnnouncement("기자의 취재 결과, " + target.getName() + "님의 직업은 [" + target.getJob().getJobName() + "] 입니다!");
+                } else {
+                    addPublicAnnouncement("기자가 취재를 시도했으나 밤 사이 사망하여 특종이 묻혔습니다.");
+                }
+            }
+            
+            // 장의사의 부검 결과 처리
+            else if (user.getJob() instanceof Undertaker) {
+                if (user.isAlive()) {
+                    addPublicAnnouncement("장의사의 부검 결과, " + target.getName() + "님의 직업은 [" + target.getJob().getJobName() + "] 였습니다.");
+                } else {
+                    addPublicAnnouncement("장의사가 부검을 시도했으나 밤 사이 사망하여 부검 결과가 유실되었습니다.");
+                }
+            }
+        }
+    }
 
 	/**
 	 * 낮 토론 페이즈
@@ -871,81 +936,96 @@ public class GameManager {
     }
 
 	/**
-	 * 낮 추방 결과 처리 페이즈
-	 */
-	private void processDayExecutionPhase() {
-		if (voteRecords.isEmpty()) {
-			System.out.println("투표가 진행되지 않았습니다.");
-			return;
-		}
+     * 낮 추방 결과 처리 페이즈
+     * 
+     * 1. 모든 투표를 집계 (정치인의 2표 포함)
+     * 2. 투표 결과 전체 공지
+     * 3. 최다 득표자 결정, 동점 여부 확인
+     * 4. 최다 득표자가 1명일 경우, 정치인의 처세 능력을 확인 후 추방 절차 진행
+     */
+    private void processDayExecutionPhase() {
+        if (voteRecords.isEmpty()) {
+            ui.displayPublicMessage("투표가 진행되지 않아 아무도 추방되지 않았습니다.");
+            return;
+        }
 
-		// 투표 결과 집계
-		Map<Player, Integer> voteCounts = new HashMap<>();
-		
-		voteCounts.clear(); // 다시 계산
-		int maxVotes = 0;
-		
-		for (Player targetPlayer : getLivingPlayers()) { // 모든 살아있는 플레이어를 대상으로 득표수 계산
-			int currentVotesForTarget = 0;
-			for (Map.Entry<Player, Player> entry : voteRecords.entrySet()) {
-				Player voter = entry.getKey();
-				Player votedTarget = entry.getValue();
-				if (votedTarget.equals(targetPlayer)) { // 투표 대상이 현재 정확한지 확인
-					if (voter.getJob() instanceof com.mafiagame.logic.job.Politician) { // 정치인 논객 능력 고려 (Politician 클래스
-																						// 직접 참조)
-						currentVotesForTarget += 2;
-					} else {
-						currentVotesForTarget += 1;
-					}
-				}
-			}
-			voteCounts.put(targetPlayer, currentVotesForTarget);
-			if (currentVotesForTarget > maxVotes) {
-				maxVotes = currentVotesForTarget;
-			}
-		}
+        // 1. 투표 집계: 각 플레이어가 받은 득표수를 계산
+        Map<Player, Integer> voteCounts = new HashMap<>();
+        int maxVotes = 0;
 
-		List<Player> mostVotedPlayers = new ArrayList<>();
-		if (maxVotes > 0) { // 아무도 투표 안 받은 경우 제외
-			for (Map.Entry<Player, Integer> entry : voteCounts.entrySet()) {
-				if (entry.getValue() == maxVotes) {
-					mostVotedPlayers.add(entry.getKey());
-				}
-			}
-		}
+        for (Map.Entry<Player, Player> entry : voteRecords.entrySet()) {
+            Player voter = entry.getKey();
+            Player votedTarget = entry.getValue();
+            
+            // 유효한 투표인지 확인 (오류 방지)
+            if (voter == null || votedTarget == null) continue;
 
-		ui.displayPublicMessage("\n--- 투표 결과 ---");
-		for (Map.Entry<Player, Integer> entry : voteCounts.entrySet()) {
-			if (entry.getValue() > 0) {
-				ui.displayPublicMessage(entry.getKey().getName() + ": " + entry.getValue() + "표");
-			}
-		}
+            // 투표자의 직업에 따라 투표 가중치(voteWeight) 가져옴
+            int voteWeight = voter.getJob().getVoteWeight();
+            
+            // 해당 후보의 득표수에 가중치를 더함
+            int currentVotes = voteCounts.getOrDefault(votedTarget, 0);
+            voteCounts.put(votedTarget, currentVotes + voteWeight);
+        }
 
-		if (mostVotedPlayers.size() == 1) {
-			Player executedPlayer = mostVotedPlayers.get(0);
-			ui.displayPublicMessage("\n투표 결과, " + executedPlayer.getName() + "님이 최다 득표하였습니다.");
+        // 2. 투표 결과 공지
+        ui.displayPublicMessage("\n--- 투표 결과 ---");
+        if (voteCounts.isEmpty()) {
+            ui.displayPublicMessage("아무도 득표하지 않았습니다.");
+        } else {
+            for (Map.Entry<Player, Integer> entry : voteCounts.entrySet()) {
+                ui.displayPublicMessage(entry.getKey().getName() + ": " + entry.getValue() + "표");
+            }
+        }
+        
+        // 3. 최다 득표자 찾기
+        for (int votes : voteCounts.values()) {
+            if (votes > maxVotes) {
+                maxVotes = votes;
+            }
+        }
 
-			// 정치인 처세 능력 확인
-			if (executedPlayer.getJob() instanceof com.mafiagame.logic.job.Politician) {
-				Politician politicianJob = (Politician) executedPlayer.getJob(); // 타입 캐스팅
-				if (politicianJob.canEvadeExecutionByInfluence()) { // 정치인의 특화된 메서드 호출
-					ui.displayPublicMessage(executedPlayer.getName() + "님은 정치인의 처세 능력으로 추방을 면했습니다! 직업은 [정치인] 입니다.");
-					// 정체 공개, 추방되지 않음
-				}
-			} else {
-				processExecution(executedPlayer);
-			}
+        List<Player> mostVotedPlayers = new ArrayList<>();
+        if (maxVotes > 0) {
+            for (Map.Entry<Player, Integer> entry : voteCounts.entrySet()) {
+                if (entry.getValue() == maxVotes) {
+                    mostVotedPlayers.add(entry.getKey());
+                }
+            }
+        }
 
-		} else if (mostVotedPlayers.size() > 1) {
-			ui.displayPublicMessage("\n최다 득표자가 " + mostVotedPlayers.size() + "명으로 동점이므로, 아무도 추방되지 않습니다.");
-		} else { // maxVotes == 0 인 경우 (아무도 투표 안했거나, 모든 투표가 0표)
-			ui.displayPublicMessage("\n투표 결과, 아무도 추방되지 않았습니다.");
-		}
-		voteRecords.clear(); // 투표 기록 초기화
-	}
+        // 4. 결과 처리
+        if (mostVotedPlayers.size() == 1) {
+            Player executedPlayer = mostVotedPlayers.get(0);
+            ui.displayPublicMessage("\n투표 결과, " + executedPlayer.getName() + "님이 최다 득표하였습니다.");
+
+            // 정치인의 '처세' 능력 발동 여부 확인
+            if (executedPlayer.getJob() instanceof Politician) {
+                Politician politicianJob = (Politician) executedPlayer.getJob();
+                if (politicianJob.tryEvadeExecution()) {
+                    ui.displayPublicMessage(executedPlayer.getName() + "님은 정치인의 처세 능력으로 추방을 면했습니다! 직업은 [정치인] 입니다.");
+                    // 추방이 무효화되었으므로, 여기서 메서드 실행을 종료
+                    voteRecords.clear(); // 투표 기록만 초기화하고 종료
+                    return;
+                }
+            }
+            
+            // 정치인 능력이 발동하지 않았거나, 다른 직업인 경우 정상 추방 절차 진행
+            processExecution(executedPlayer);
+
+        } else if (mostVotedPlayers.size() > 1) {
+            ui.displayPublicMessage("\n최다 득표자가 " + mostVotedPlayers.size() + "명으로 동점이므로, 아무도 추방되지 않습니다.");
+        } else { // maxVotes == 0
+            ui.displayPublicMessage("\n투표 결과, 아무도 추방되지 않았습니다.");
+        }
+        
+        // 다음 날을 위해 투표 기록 초기화
+        voteRecords.clear();
+    }
 
 	/**
-	 * 실제 플레이어 추방 처리를 담당하는 메서드. 테러리스트 능력 발동 등을 여기서 처리.
+	 * 실제 플레이어 추방 처리를 담당하는 메서드
+	 * 테러리스트 능력 발동 등을 처리
 	 * 
 	 * @param executedPlayer 추방될 플레이어
 	 */
@@ -1036,16 +1116,6 @@ public class GameManager {
 
 	// --- 헬퍼(유틸리티) 메서드 ---
 
-	public List<Player> getLivingPlayers() {
-		List<Player> living = new ArrayList<>();
-		for (Player p : players) {
-			if (p.isAlive()) {
-				living.add(p);
-			}
-		}
-		return living;
-	}
-
 	public int getDayCount() {
 		return dayCount;
 	}
@@ -1073,6 +1143,24 @@ public class GameManager {
 	public List<Player> getAllPlayers() {
 		return Collections.unmodifiableList(players);
 	}
+	
+	public List<Player> getLivingPlayers() {
+		List<Player> living = new ArrayList<>();
+		for (Player p : players) {
+			if (p.isAlive()) {
+				living.add(p);
+			}
+		}
+		return living;
+	}
+	
+	public List<Player> getDeadPlayers() {
+        return players.stream().filter(p -> !p.isAlive()).collect(Collectors.toList());
+    }
+	
+	public Map<Player, Player> getNightAbilityTargets() {
+        return this.nightAbilityTargets;
+    }
 	
 	/**
      * Job 클래스들이 플레이어 입력을 받기 위해 호출할 메서드

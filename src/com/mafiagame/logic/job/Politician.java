@@ -1,29 +1,53 @@
 package com.mafiagame.logic.job;
 
-import java.util.List;
-
+import com.mafiagame.logic.common.enums.JobType;
 import com.mafiagame.logic.common.enums.Team;
 import com.mafiagame.logic.game.GameManager;
 import com.mafiagame.logic.game.Player;
+import java.util.List;
 
 public class Politician extends Job {
 
-	public Politician(String jobName, Team team, String description, boolean hasNightAbility,
-			boolean isOneTimeAbility) {
-		super(jobName, team, description, hasNightAbility, isOneTimeAbility);
-		// TODO Auto-generated constructor stub
-	}
+    private static final String JOB_NAME = "정치인";
+    private static final Team TEAM = Team.CITIZEN;
+    private static final JobType JOB_TYPE = JobType.POLITICIAN;
+    private static final String DESCRIPTION = "투표로 처형당할 때 한 번 무효화시킬 수 있으며, 투표권이 2표입니다.";
+    private static final boolean HAS_NIGHT_ABILITY = false; // 밤 능력이 없음
+    private static final boolean IS_ONE_TIME_ABILITY = true;  // 처세 능력은 1회성
 
-	@Override
-	public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
-		// TODO Auto-generated method stub
-		
-	}
+    public Politician() {
+        super(JOB_NAME, TEAM, JOB_TYPE, DESCRIPTION, HAS_NIGHT_ABILITY, IS_ONE_TIME_ABILITY);
+    }
 
-	@Override
-	public String getNightActionPrompt(Player self) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    @Override
+    public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
+        // 아무것도 하지 않음
+    }
 
+    @Override
+    public String getNightActionPrompt(Player self, GameManager gameManager) {
+        return "사용할 수 있는 능력이 없습니다.";
+    }
+
+    /**
+     * 정치인의 투표권은 2표
+     */
+    @Override
+    public int getVoteWeight() {
+        return 2;
+    }
+
+    /**
+     * '처세' 능력을 사용하여 처형 회피
+     * 이 메서드는 GameManager의 processDayExecutionPhase에서 호출
+     * 
+     * @return 처세 능력 발동에 성공하면 true, 실패하면 false
+     */
+    public boolean tryEvadeExecution() {
+        if (!this.oneTimeAbilityUsed) {
+            this.oneTimeAbilityUsed = true; // 1회성 능력 사용으로 상태 변경
+            return true; // 능력 발동 성공
+        }
+        return false; // 이미 사용해서 실패
+    }
 }

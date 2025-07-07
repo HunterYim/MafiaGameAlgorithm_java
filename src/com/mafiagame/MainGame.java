@@ -3,7 +3,6 @@ package com.mafiagame;
 import com.mafiagame.logic.common.enums.GameMode;
 import com.mafiagame.logic.game.GameManager;
 import com.mafiagame.ui.ConsoleUI;
-import com.mafiagame.ui.GameUI;
 
 // 게임 실행을 담당하는 메인 클래스
 public class MainGame {

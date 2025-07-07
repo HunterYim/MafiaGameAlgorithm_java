@@ -2,7 +2,6 @@ package com.mafiagame.logic.game;
 
 import com.mafiagame.logic.common.enums.Team;
 import com.mafiagame.logic.job.Job;
-import java.util.List;
 
 /**
  * 게임에 참여하는 개별 플레이어를 나타내는 클래스
@@ -135,18 +134,6 @@ public class Player {
     }
 
     /**
-     * (텍스트용) 이 플레이어의 직업이 밤에 보여줄 능력 사용 안내 메시지 반환
-     * 
-     * @return 능력 사용 안내 프롬프트 문자열
-     */
-    public String getNightActionPrompt() {
-        if (job != null && job.hasNightAbility()) {
-            return job.getNightActionPrompt(this);
-        }
-        return "사용할 수 있는 능력이 없습니다.";
-    }
-
-    /**
      * (비공개 확인 페이즈용) 이 플레이어에게 전달될 개인적인 밤 결과 메시지 반환
      * 
      * @param resultInfo GameManager로부터 전달받은 결과 정보 객체
@@ -169,6 +156,10 @@ public class Player {
         String teamStr = (currentTeam != null) ? currentTeam.name() : "미정";
         return String.format("%d. %s (%s, 팀: %s, 직업: %s)",
                 playerNumber, name, (isAlive ? "생존" : "사망"), teamStr, jobNameStr);
+    }
+    
+    public int compareTo(Player other) {
+    	return Integer.compare(this.getPlayerNumber(), other.getPlayerNumber());
     }
 
     // equals()와 hashCode()는 플레이어 객체를 Set이나 Map의 키로 사용할 경우 사용

@@ -47,8 +47,12 @@ public abstract class Job {
         return jobName;
     }
 
-    public Team getInitialTeam() { // 초기 팀 반환 (간첩 포섭 고려)
+    public Team getInitialTeam() {
         return team;
+    }
+    
+    public JobType getJobType() {
+        return jobType;
     }
 
     public String getDescription() {
@@ -65,6 +69,15 @@ public abstract class Job {
 
     public boolean hasUsedOneTimeAbility() {
         return oneTimeAbilityUsed;
+    }
+    
+    /**
+     * 이 직업의 투표 가중치 반환 (기본값 1)
+     * 
+     * @return 투표권 수
+     */
+    public int getVoteWeight() {
+        return 1;
     }
 
     /**
@@ -165,9 +178,10 @@ public abstract class Job {
      * 각 직업 클래스에서 구체적인 안내 메시지 구현
      *
      * @param self 능력을 사용하려는 플레이어 자신
+     * @param gameManager 게임 매니저 객체 (날짜 등 게임 상태 접근용)
      * @return 능력 사용 안내 프롬프트 문자열
      */
-    public abstract String getNightActionPrompt(Player self);
+    public abstract String getNightActionPrompt(Player self, GameManager gameManager);
 
 
     /**

@@ -1,5 +1,78 @@
 package com.mafiagame.logic.job;
 
-public class Detective {
+import com.mafiagame.logic.common.enums.JobType;
+import com.mafiagame.logic.common.enums.Team;
+import com.mafiagame.logic.game.GameManager;
+import com.mafiagame.logic.game.Player;
+import java.util.List;
+import java.util.stream.Collectors;
 
+public class Detective extends Job {
+
+    private static final String JOB_NAME = "탐정";
+    private static final Team TEAM = Team.CITIZEN;
+    private static final JobType JOB_TYPE = JobType.DETECTIVE;
+    private static final String DESCRIPTION = "밤마다 한 명을 선택해 그 사람이 밤에 능력을 사용했는지 여부를 알아냅니다.";
+    private static final boolean HAS_NIGHT_ABILITY = true;
+    private static final boolean IS_ONE_TIME_ABILITY = false;
+
+    public Detective() {
+        super(JOB_NAME, TEAM, JOB_TYPE, DESCRIPTION, HAS_NIGHT_ABILITY, IS_ONE_TIME_ABILITY);
+    }
+
+    @Override
+    public String getNightActionPrompt(Player self, GameManager gameManager) {
+        return "추리할 대상을 선택하세요.";
+    }
+
+    @Override
+    public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
+        List<Player> selectablePlayers = livingPlayers.stream()
+                .filter(p -> !p.equals(self))
+                .collect(Collectors.toList());
+
+        if (selectablePlayers.isEmpty()) return;
+
+        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), selectablePlayers);
+        if (target != null) {
+            gameManager.recordNightAbilityTarget(self, target);
+        }
+    }
+    
+    @Override
+    public int getNightActionPriority() {
+        return 3; // 우선순위: 정보 수집
+    }
+
+    @Override
+    public void applyNightEffect(GameManager gameManager, Player user, Player target) {
+        if (target == null) return;
+
+        // GameManager의 밤 행동 기록을 확인하여 대상이 능력을 사용했는지 판별
+        boolean targetUsedAbility = gameManager.getNightAbilityTargets().containsKey(target);
+
+        // 결과 저장을 위해 Map 사용
+        java.util.Map<String, Object> resultData = new java.util.HashMap<>();
+        resultData.put("targetName", target.getName());
+        resultData.put("usedAbility", targetUsedAbility);
+
+        gameManager.recordPrivateNightResult(user, resultData);
+    }
+    
+    @Override
+    @SuppressWarnings("unchecked")
+    public String getPrivateNightResultMessage(Player self, Object resultInfo, GameManager gameManager) {
+        if (resultInfo instanceof java.util.Map) {
+            java.util.Map<String, Object> data = (java.util.Map<String, Object>) resultInfo;
+            String targetName = (String) data.get("targetName");
+            boolean usedAbility = (Boolean) data.get("usedAbility");
+
+            if (usedAbility) {
+                return "추리 결과, " + targetName + "님은 어젯밤 능력을 사용했습니다.";
+            } else {
+                return "추리 결과, " + targetName + "님은 어젯밤 아무런 능력도 사용하지 않았습니다.";
+            }
+        }
+        return "추리 결과를 가져오는 데 실패했습니다.";
+    }
 }

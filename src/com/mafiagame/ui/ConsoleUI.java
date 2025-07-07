@@ -49,18 +49,26 @@ public class ConsoleUI implements GameUI {
     public Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets) {
         displayPrivateMessage(actor, prompt);
         
+        // "0. 아무도 선택하지 않음" 옵션
+        displayPrivateMessage(actor, "0. 아무도 선택하지 않음");
+        
         // 선택지 출력
         for (int i = 0; i < targets.size(); i++) {
-            // 메시지를 actor에게만 보여주기 위해 displayPrivateMessage 사용
             displayPrivateMessage(actor, String.format("%d. %s", i + 1, targets.get(i).getName()));
         }
 
         while (true) {
             System.out.print("[" + actor.getName() + "님] 번호를 입력하세요: ");
             try {
-                int choice = Integer.parseInt(scanner.nextLine().trim()) - 1;
-                if (choice >= 0 && choice < targets.size()) {
-                    return targets.get(choice); // 유효한 선택, 선택된 Player 객체 반환
+                int choice = Integer.parseInt(scanner.nextLine().trim());
+                
+                if (choice == 0) {
+                    return null; 
+                }
+                
+                int choiceIndex = choice - 1;
+                if (choiceIndex >= 0 && choiceIndex < targets.size()) {
+                    return targets.get(choiceIndex); // 유효한 선택, 선택된 Player 객체 반환
                 } else {
                     displayPrivateMessage(actor, "잘못된 번호입니다. 다시 입력해주세요.");
                 }
