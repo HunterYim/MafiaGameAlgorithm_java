@@ -6,6 +6,7 @@ import com.mafiagame.logic.game.GameManager;
 import com.mafiagame.logic.game.Player;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class Mafia extends Job {
@@ -52,27 +53,60 @@ public class Mafia extends Job {
 
     @Override
     public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
+    	String finalPrompt;
+    	
+    	// 1. 공격수일 경우, 동료들의 지명 현황을 확인
         if (isAttackCommander(self, gameManager)) {
-        	List<Player> attackablePlayers = livingPlayers.stream()
-                    .filter(p -> !p.equals(self))
-                    .collect(Collectors.toList());
+            Map<Player, Player> nominations = gameManager.getMafiaNominations();
+            StringBuilder promptBuilder = new StringBuilder(getNightActionPrompt(self, gameManager));
             
-            Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), attackablePlayers);
-            if (target != null) {
-                gameManager.recordNightAbilityTarget(self, target);
+            if (!nominations.isEmpty()) {
+                promptBuilder.append("\n[동료 지명 현황]");
+                for (Map.Entry<Player, Player> entry : nominations.entrySet()) {
+                    promptBuilder.append("\n- ").append(entry.getKey().getName()).append(" -> ").append(entry.getValue().getName());
+                }
+            } else {
+                promptBuilder.append("\n(아직 동료의 지명이 없습니다)");
             }
+            finalPrompt = promptBuilder.toString();
+        
+        // 2. 공격수가 아닐 경우 (지명자), 기본 안내 메시지 사용
+        } else {
+            finalPrompt = getNightActionPrompt(self, gameManager);
+        }
+
+        // 3. UI를 통해 대상 선택 입력받기
+        List<Player> selectablePlayers = livingPlayers.stream()
+                .filter(p -> p.getCurrentTeam() != Team.MAFIA)
+                .collect(Collectors.toList());
+        if (selectablePlayers.isEmpty()) return;
+
+        Player target = gameManager.getPlayerInputForNightAction(self, finalPrompt, selectablePlayers);
+        if (target == null) return;
+        
+        // 4. 역할에 따라 다른 기록 메서드 호출
+        if (isAttackCommander(self, gameManager)) {
+            // 공격수는 최종 공격 대상을 기록 (applyNightEffect에서 사용됨)
+            gameManager.recordNightAbilityTarget(self, target);
+        } else {
+            // 지명자는 실시간 지명 기록에 추가
+            gameManager.recordMafiaNomination(self, target);
+            // 동시에, 탐정의 '추리' 등을 위해 '능력을 사용했다'는 사실 자체는 기록해줌
+            gameManager.recordNightAbilityTarget(self, target);
         }
     }
 
     @Override
     public int getNightActionPriority() {
-        return 2; // 우선순위: 공격
+        return 2; // 우선순위: 공격, 지명
     }
 
     @Override
     public void applyNightEffect(GameManager gameManager, Player user, Player target) {
-        if (target == null) return;
-
+    	if (!isAttackCommander(user, gameManager) || target == null) {
+            return;
+        }
+    	
         if (target.getJob() instanceof Warewolf) {
             ((Warewolf) target.getJob()).triggerContact(gameManager, target, user);
             return;

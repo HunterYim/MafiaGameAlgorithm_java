@@ -52,6 +52,9 @@ public class GameManager {
 	
 	// 오늘 낮에 추방된 플레이어 목록 (테러리스트 등 처리용)
 	private List<Player> executedPlayersToday;
+	
+    // 마피아의 실시간 지명 기록 (지명자, 지명 대상)
+	private Map<Player, Player> mafiaNominations;
 
 	public GameManager(GameUI ui) {
 		this.ui = ui; // 외부에서 생성된 UI 객체 유입
@@ -62,6 +65,7 @@ public class GameManager {
 		this.publicAnnouncements = new ArrayList<>();
 		this.intimidatedPlayers = new ArrayList<>();
 		this.executedPlayersToday = new ArrayList<>();
+		this.mafiaNominations = new HashMap<>();
 		this.dayCount = 1; // 1일차부터 시작
 		this.isGameOver = false;
 		this.currentPlayerIndex = 0; // 첫 번째 플레이어부터 시작
@@ -444,6 +448,7 @@ public class GameManager {
 			resetPlayersNightStatus(); // 플레이어 밤 상태 및 투표 가능 여부 초기화
 			this.intimidatedPlayers.clear(); // 건달 협박 목록 초기화 (다음 날을 위해)
 			this.executedPlayersToday.clear(); // 이전 낮 추방자 목록 초기화
+			this.mafiaNominations.clear(); // 마피아 지명 기록 초기화
 			break;
 		case GAME_OVER:
 			// 이미 게임 종료 상태이므로 변경 없음
@@ -602,221 +607,6 @@ public class GameManager {
         String deathMessage = player.getName() + "님이 밤 사이 사망했습니다.";
         return publicAnnouncements.contains(deathMessage);
     }
-    
-//	/**
-//     * 밤 동안 사용된 능력들의 결과를 종합하고 플레이어 상태 업데이트
-//     * 각 기능별 private 메서드를 순서대로 호출하여 전체 흐름 제어
-//     */
-//    private void applyNightActionsAndResults() {
-//        // 0. 필요한 정보 저장을 위한 임시 컨테이너 생성
-//        NightActionContext context = new NightActionContext();
-//
-//        // 1. 밤 능력 사용 기록 분석 및 컨텍스트 준비
-//        analyzeNightAbilityRecords(context);
-//
-//        // 2. 방어/보호 능력 우선 적용 (예: 군인)
-//        handleDefensiveAbilities(context);
-//
-//        // 3. 공격 능력 처리 및 사망자 결정 (마피아, 늑대인간)
-//        handleAttackAbilities(context);
-//
-//        // 4. 기타 능력 결과 적용 (건달, 간첩, 기자, 장의사, 도굴꾼 등)
-//        handleOtherAbilities(context);
-//
-//        // 밤 능력 대상 기록 초기화
-//        nightAbilityTargets.clear();
-//    }
-	
-//	/**
-//     * 밤 동안의 행동 결과를 담는 내부 헬퍼 클래스
-//     * 각 처리 메서드 간에 정보를 전달하기 위해 사용
-//     */
-//    private static class NightActionContext {
-//        Map<Player, Boolean> isHealedMap = new HashMap<>();
-//        Map<Player, Boolean> isProtectedBySoldierMap = new HashMap<>();
-//        Player mafiaAttackTarget = null;
-//        Player warewolfAttackTarget = null;
-//        Map<Player, Player> gangsterTargets = new HashMap<>();
-//        Map<Player, Player> spyRecruitTargets = new HashMap<>();
-//        Player reporterTarget = null;
-//        String reporterOriginalJob = null;
-//        Player undertakerTarget = null; // 장의사 대상은 아직 분석 로직에 없었지만 추가
-//        String undertakerOriginalJob = null; // 장의사 결과 저장용
-//        List<Player> diedThisNight = new ArrayList<>();
-//    }
-    
-//    /**
-//     * 1. nightAbilityTargets 맵을 분석하여 밤 동안의 능력 사용 기록을 NightActionContext 객체에 정리
-//     * 
-//     * @param context 밤 행동 결과를 저장하고 전달할 컨텍스트 객체
-//     */
-//    private void analyzeNightAbilityRecords(NightActionContext context) {
-//        // nightAbilityTargets에는 (능력 사용자, 능력 대상)이 기록되어 있음.
-//        for (Map.Entry<Player, Player> entry : nightAbilityTargets.entrySet()) {
-//            Player user = entry.getKey();
-//            Player target = entry.getValue();
-//
-//            if (user.getJob() instanceof Doctor) {
-//                context.isHealedMap.put(target, true);
-//            } else if (user.getJob() instanceof Mafia && ((Mafia) user.getJob()).isAttackCommander(user, this)) {
-//                context.mafiaAttackTarget = target;
-//            } else if (user.getJob() instanceof Warewolf && ((Warewolf) user.getJob()).canUseMassacre(this)) {
-//                context.warewolfAttackTarget = target;
-//            } else if (user.getJob() instanceof Gangster) {
-//                context.gangsterTargets.put(user, target);
-//            } else if (user.getJob() instanceof Spy && user.getJob().canUseAbility(user, dayCount, this)) {
-//                context.spyRecruitTargets.put(user, target);
-//            } else if (user.getJob() instanceof Reporter && user.getJob().canUseAbility(user, dayCount, this)) {
-//                context.reporterTarget = target;
-//                if (context.reporterTarget != null) context.reporterOriginalJob = context.reporterTarget.getJob().getJobName();
-//            }
-//            // TODO ... 장의사, 탐정 등 기타 다른 직업들의 능력 사용 기록 분석 추가 ...
-//        }
-//    }
-    
-//    /**
-//     * 2. 방어/보호 능력을 처리합니다. (예: 군인)
-//     * @param context 밤 행동 결과가 담긴 컨텍스트 객체
-//     */
-//    private void handleDefensiveAbilities(NightActionContext context) {
-//        // 마피아 공격 대상이 군인이고, 군인이 방어 능력을 사용하지 않았다면 방어 발동.
-//        if (context.mafiaAttackTarget != null && context.mafiaAttackTarget.getJob() instanceof Soldier) {
-//            Soldier soldierJob = (Soldier) context.mafiaAttackTarget.getJob();
-//            if (soldierJob.tryActivateDefense(context.mafiaAttackTarget)) { // Soldier 클래스에 이런 메서드가 있다고 가정
-//                context.isProtectedBySoldierMap.put(context.mafiaAttackTarget, true);
-//                publicAnnouncements.add(context.mafiaAttackTarget.getName() + "님이 마피아의 공격을 받았으나, 군인의 방어 능력으로 막아냈습니다! 직업은 [군인]입니다.");
-//            }
-//        }
-//        // 늑대인간 공격에 대한 군인 방어는 handleAttackAbilities 에서 직접 처리 (공격 종류에 따라 다를 수 있으므로)
-//    }
-
-//    /**
-//     * 3. 공격 능력(마피아, 늑대인간)을 처리하고 사망자를 결정합니다.
-//     * @param context 밤 행동 결과가 담긴 컨텍스트 객체
-//     */
-//    private void handleAttackAbilities(NightActionContext context) {
-//        // 3.1. 마피아 공격 처리
-//        if (context.mafiaAttackTarget != null && context.mafiaAttackTarget.isAlive()) {
-//            boolean saved = false;
-//            if (context.isHealedMap.getOrDefault(context.mafiaAttackTarget, false)) {
-//                publicAnnouncements.add(context.mafiaAttackTarget.getName() + "님이 마피아의 공격을 받았지만, 의사의 치료로 생존했습니다!");
-//                recordPrivateNightResult(getDoctorPlayer(), context.mafiaAttackTarget.getName() + "님을 성공적으로 치료했습니다.");
-//                saved = true;
-//            } else if (context.isProtectedBySoldierMap.getOrDefault(context.mafiaAttackTarget, false)) {
-//                saved = true; // 군인 방어 메시지는 handleDefensiveAbilities에서 이미 추가됨
-//            }
-//
-//            if (!saved) {
-//                context.mafiaAttackTarget.die();
-//                context.diedThisNight.add(context.mafiaAttackTarget);
-//                publicAnnouncements.add(context.mafiaAttackTarget.getName() + "님이 밤 사이 마피아의 공격으로 사망했습니다.");
-//                if (getDoctorPlayer() != null && nightAbilityTargets.get(getDoctorPlayer()) == context.mafiaAttackTarget) {
-//                     recordPrivateNightResult(getDoctorPlayer(), context.mafiaAttackTarget.getName() + "님을 치료하려 했으나, 이미 사망했습니다.");
-//                }
-//            }
-//        } else if (context.mafiaAttackTarget == null && getDoctorPlayer() != null && nightAbilityTargets.containsKey(getDoctorPlayer())) {
-//            Player healedTargetByDoctor = nightAbilityTargets.get(getDoctorPlayer());
-//            if (healedTargetByDoctor != null) recordPrivateNightResult(getDoctorPlayer(), healedTargetByDoctor.getName() + "님은 공격받지 않았습니다.");
-//        }
-//
-//        // 3.2. 늑대인간 살육 처리 (치료 무시)
-//        if (context.warewolfAttackTarget != null && context.warewolfAttackTarget.isAlive()) {
-//            boolean savedBySoldier = false;
-//            if (context.warewolfAttackTarget.getJob() instanceof Soldier) {
-//                Soldier soldierJob = (Soldier) context.warewolfAttackTarget.getJob();
-//                // isProtectedBySoldierMap을 체크하여 군인 방어가 이미 마피아 공격에 사용되었는지 확인 가능
-//                if (!context.isProtectedBySoldierMap.containsKey(context.warewolfAttackTarget) && soldierJob.tryActivateDefense(context.warewolfAttackTarget)) {
-//                    context.isProtectedBySoldierMap.put(context.warewolfAttackTarget, true);
-//                    publicAnnouncements.add(context.warewolfAttackTarget.getName() + "님이 늑대인간의 공격을 받았으나, 군인의 방어 능력으로 막아냈습니다! 직업은 [군인]입니다.");
-//                    savedBySoldier = true;
-//                }
-//            }
-//
-//            if (!savedBySoldier) {
-//                context.warewolfAttackTarget.die();
-//                context.diedThisNight.add(context.warewolfAttackTarget);
-//                publicAnnouncements.add(context.warewolfAttackTarget.getName() + "님이 밤 사이 늑대인간의 공격으로 사망했습니다. (치료 불가)");
-//            }
-//        }
-//    }
-
-//    /**
-//     * 4. 건달, 간첩, 기자, 장의사, 도굴꾼 등 기타 능력들을 처리합니다.
-//     * @param context 밤 행동 결과가 담긴 컨텍스트 객체
-//     */
-//    private void handleOtherAbilities(NightActionContext context) {
-//        // 4.1. 건달 협박 적용
-//        for (Map.Entry<Player, Player> entry : context.gangsterTargets.entrySet()) {
-//            Player gangsterUser = entry.getKey();
-//            Player intimidatedTarget = entry.getValue();
-//            if (intimidatedTarget != null && intimidatedTarget.isAlive()) {
-//                intimidatedTarget.setCanVoteToday(false);
-//                recordPrivateNightResult(gangsterUser, intimidatedTarget.getName() + "님을 협박했습니다.");
-//                recordPrivateNightResult(intimidatedTarget, "당신은 건달에게 협박당해 오늘 투표할 수 없습니다.");
-//            }
-//        }
-//
-//        // 4.2. 간첩 포섭 처리
-//        for (Map.Entry<Player, Player> entry : context.spyRecruitTargets.entrySet()) {
-//            Player spy = entry.getKey();
-//            Player targetToRecruit = entry.getValue();
-//
-//            if (targetToRecruit != null && targetToRecruit.isAlive()) {
-//                boolean recruitSuccess = false;
-//                if (!(targetToRecruit.getJob() instanceof Mafia) && !(targetToRecruit.getJob() instanceof Soldier)) {
-//                    if (targetToRecruit.getCurrentTeam() != Team.SPY) {
-//                        targetToRecruit.setCurrentTeam(Team.SPY);
-//                        recruitSuccess = true;
-//                    }
-//                }
-//
-//                String recruitResultMessageForSpy, recruitResultMessageForTarget = null, publicRecruitAnnouncement;
-//                if (recruitSuccess) {
-//                    recruitResultMessageForSpy = targetToRecruit.getName() + "님(" + targetToRecruit.getJob().getJobName() + ")을 성공적으로 포섭했습니다.";
-//                    recruitResultMessageForTarget = "당신은 간첩에게 포섭되었습니다. 이제부터 간첩 팀 소속입니다. 당신을 포섭한 간첩은 " + spy.getName() + " 입니다.";
-//                    publicRecruitAnnouncement = "간첩이 포섭에 성공했습니다.";
-//                } else {
-//                    recruitResultMessageForSpy = targetToRecruit.getName() + "님(" + targetToRecruit.getJob().getJobName() + ") 포섭에 실패했습니다.";
-//                    publicRecruitAnnouncement = "간첩이 포섭에 실패했습니다.";
-//                }
-//                recordPrivateNightResult(spy, recruitResultMessageForSpy);
-//                if (recruitSuccess && recruitResultMessageForTarget != null) recordPrivateNightResult(targetToRecruit, recruitResultMessageForTarget);
-//                publicAnnouncements.add(publicRecruitAnnouncement);
-//            }
-//        }
-//
-//        // 4.3. 정보 수집 능력은 개인 결과 확인 페이즈에서 처리되므로, 여기서는 별도 처리 불필요.
-//
-//        // 4.4. 접선 처리도 Job의 performNightAction에서 recordPrivateNightResult로 처리.
-//
-//        // 4.5. 기자 취재 결과 (낮에 공개될 내용 준비)
-//        if (context.reporterTarget != null && context.reporterOriginalJob != null) {
-//            Player reporterPlayer = getPlayerByJob(Reporter.class);
-//            if (reporterPlayer != null && reporterPlayer.isAlive()) {
-//                 publicAnnouncements.add("기자의 취재 결과, " + context.reporterTarget.getName() + "님의 직업은 [" + context.reporterOriginalJob + "] 입니다.");
-//            } else {
-//                 publicAnnouncements.add("기자가 취재를 시도했으나, 밤 사이 사망하여 취재 결과가 무효화되었습니다.");
-//            }
-//        }
-//        // 장의사 부검도 유사하게 처리
-//
-//        // 5. 도굴꾼 능력 처리 (첫날 밤)
-//        if (dayCount == 0 && !context.diedThisNight.isEmpty()) {
-//            Player graveRobber = getPlayerByJob(GraveRobber.class);
-//            if (graveRobber != null && graveRobber.isAlive()) {
-//                Player firstDeadByAttack = context.diedThisNight.stream()
-//                        .filter(p -> nightAbilityTargets.containsValue(p))
-//                        .findFirst().orElse(null);
-//
-//                if (firstDeadByAttack != null) {
-//                    Job stolenJob = firstDeadByAttack.getJob();
-//                    graveRobber.setJob(stolenJob);
-//                    recordPrivateNightResult(graveRobber, "당신은 " + firstDeadByAttack.getName() + "님의 직업 [" + stolenJob.getJobName() + "]을 도굴했습니다.");
-//                    publicAnnouncements.add("도굴꾼이 밤 사이 누군가의 직업을 도굴한 것 같습니다...");
-//                }
-//            }
-//        }
-//    }
     
 	/**
 	 * 밤 개인 결과 확인 페이즈
@@ -1195,6 +985,27 @@ public class GameManager {
 			nightResultsForPrivateConfirmation.put(player, resultInfo);
 		}
 	}
+	
+	/**
+	 * (마피아용) 실시간 지명 내용을 기록
+	 * 
+	 * @param nominator 지명한 마피아
+	 * @param target    지명된 플레이어
+	 */
+	public void recordMafiaNomination(Player nominator, Player target) {
+		if (nominator != null && target != null) {
+			this.mafiaNominations.put(nominator, target);
+		}
+	}
+	
+	/**
+	 * (마피아용) 현재까지의 지명 기록을 가져옴
+	 * 
+	 * @return 지명 기록 Map
+	 */
+	public Map<Player, Player> getMafiaNominations() {
+		return this.mafiaNominations;
+	}	
 	
 	/**
      * Job 클래스들이 공개 공지사항을 추가하기 위해 호출할 메서드
