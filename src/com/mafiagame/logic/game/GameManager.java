@@ -55,6 +55,10 @@ public class GameManager {
 	
     // 마피아의 실시간 지명 기록 (지명자, 지명 대상)
 	private Map<Player, Player> mafiaNominations;
+	
+	// 밤 턴을 진행할 플레이어 목록
+    private List<Player> playersForNightTurn;
+
 
 	public GameManager(GameUI ui) {
 		this.ui = ui; // 외부에서 생성된 UI 객체 유입
@@ -66,6 +70,7 @@ public class GameManager {
 		this.intimidatedPlayers = new ArrayList<>();
 		this.executedPlayersToday = new ArrayList<>();
 		this.mafiaNominations = new HashMap<>();
+		this.playersForNightTurn = new ArrayList<>();
 		this.dayCount = 1; // 1일차부터 시작
 		this.isGameOver = false;
 		this.currentPlayerIndex = 0; // 첫 번째 플레이어부터 시작
@@ -353,12 +358,15 @@ public class GameManager {
 			System.err.println("오류: 게임이 설정되지 않았습니다. setupGame()을 먼저 호출해주세요.");
 			return;
 		}
-		ui.displayPublicMessage("\n마피아 게임을 시작합니다!");
+		ui.displaySystemMessage("\n마피아 게임을 시작합니다!");
 		this.currentPhase = GamePhase.NIGHT_JOB_CONFIRM_ABILITY;
 		this.isGameOver = false;
+		
+		this.playersForNightTurn.clear();
+	    this.playersForNightTurn.addAll(this.players);
 
 		while (!isGameOver) {
-			ui.displayPublicMessage("\n--- " + (dayCount) + "일차 시작 (" + getPhaseName(currentPhase) + ") ---");
+			ui.displaySystemMessage("\n--- [" + (dayCount) + "일차] " + getPhaseName(currentPhase) + " 페이즈 ---");
 			switch (currentPhase) {
 			case NIGHT_JOB_CONFIRM_ABILITY:
 				processNightJobConfirmAbilityPhase();
@@ -409,7 +417,7 @@ public class GameManager {
 				Thread.currentThread().interrupt();
 			}
 		}
-		ui.displayPublicMessage("\n마피아 게임이 종료되었습니다.");
+		ui.displaySystemMessage("\n마피아 게임이 종료되었습니다.");
 	}
 	
 	/**
@@ -449,6 +457,8 @@ public class GameManager {
 			this.intimidatedPlayers.clear(); // 건달 협박 목록 초기화 (다음 날을 위해)
 			this.executedPlayersToday.clear(); // 이전 낮 추방자 목록 초기화
 			this.mafiaNominations.clear(); // 마피아 지명 기록 초기화
+			this.playersForNightTurn.clear();
+            this.playersForNightTurn.addAll(getLivingPlayers());
 			break;
 		case GAME_OVER:
 			// 이미 게임 종료 상태이므로 변경 없음
@@ -469,11 +479,8 @@ public class GameManager {
 		ui.displayPublicMessage("첫날 밤입니다. 각자 직업을 확인하고 직업 확인 후 바로 개인 능력을 사용합니다.");
 		nightAbilityTargets.clear();
 
-		for (int i = 0; i < players.size(); i++) {
-			currentPlayerIndex = i;
-			Player currentPlayer = players.get(currentPlayerIndex);
-
-			if (!currentPlayer.isAlive()) continue; // 죽은 플레이어 통과
+		for (Player currentPlayer : this.playersForNightTurn) {
+			if (!currentPlayer.isAlive()) continue;
 
 			// 1. 직업 확인 메시지
 			ui.displayPrivateMessage(currentPlayer, "당신의 차례입니다. 화면을 확인하세요.");
@@ -498,12 +505,9 @@ public class GameManager {
 		ui.displayPublicMessage("밤입니다. 능력을 사용할 플레이어는 차례대로 진행합니다.");
 		nightAbilityTargets.clear(); // 밤 능력 대상 기록 초기화
 
-		for (int i = 0; i < players.size(); i++) {
-			currentPlayerIndex = i;
-			Player currentPlayer = players.get(currentPlayerIndex);
-
-			if (!currentPlayer.isAlive()) continue; // 죽은 플레이어 통과
-
+		for (Player currentPlayer : this.playersForNightTurn) {
+			if (!currentPlayer.isAlive()) continue;
+			
 			handlePlayerNightActionTurn(currentPlayer);
 
 			ui.waitForPlayerConfirmation(currentPlayer, "선택이 완료되었습니다. Enter 키를 누르고 다음 사람에게 넘기세요.");
@@ -560,11 +564,14 @@ public class GameManager {
             }
         }
 
-        // 4. 모든 효과가 적용된 후, 이번 밤에 죽은 플레이어 목록을 생성
+        // 4. '이번 밤에' 사망한 플레이어 탐색 찾아내는 로직으로 변경
         List<Player> diedThisNight = new ArrayList<>();
-        for (Player player : players) {
-            if (!player.isAlive() && !isDeathAnnounced(player)) {
-                diedThisNight.add(player);
+        for (Player p : this.playersForNightTurn) {
+            if (!p.isAlive()) {
+                // 사망 공지가 이미 기록되지 않은 경우에만 추가 (중복 방지)
+                if (!isDeathAnnounced(p)) {
+                    diedThisNight.add(p);
+                }
             }
         }
 
@@ -573,8 +580,8 @@ public class GameManager {
         
         // 6. 사망자 최종 공지
         for(Player deadPlayer : diedThisNight){
-             addPublicAnnouncement(deadPlayer.getName() + "님이 밤 사이 사망했습니다.");
-        }
+            addPublicAnnouncement(deadPlayer.getName() + "님이 밤 사이 사망했습니다.");
+       }
         
         nightAbilityTargets.clear();
     }
@@ -604,8 +611,9 @@ public class GameManager {
     
     // 유틸리티 메서드: 사망 공지가 이미 되었는지 확인 (중복 공지 방지용)
     private boolean isDeathAnnounced(Player player) {
-        String deathMessage = player.getName() + "님이 밤 사이 사망했습니다.";
-        return publicAnnouncements.contains(deathMessage);
+        String deathMessage1 = player.getName() + "님이 밤 사이 사망했습니다.";
+        String deathMessage2 = "늑대인간의 습격으로 " + player.getName() + "님이 살해당했습니다!";
+        return publicAnnouncements.stream().anyMatch(ann -> ann.contains(player.getName()));
     }
     
 	/**
@@ -613,13 +621,7 @@ public class GameManager {
 	 */
 	private void processNightPrivateConfirmPhase() {
 		ui.displayPublicMessage("밤 동안의 개인 결과를 확인합니다.");
-		for (int i = 0; i < players.size(); i++) {
-			currentPlayerIndex = i;
-			Player currentPlayer = players.get(currentPlayerIndex);
-
-			if (!currentPlayer.isAlive())
-				continue;
-
+		for (Player currentPlayer : this.playersForNightTurn) {
 			ui.displayPrivateMessage(currentPlayer, "당신의 차례입니다. 화면을 확인하세요.");
 
 			// GameManager에 저장된 해당 플레이어의 밤 결과 정보를 가져옴
@@ -716,7 +718,7 @@ public class GameManager {
 				continue;
 			}
 
-			Player votedPlayer = ui.promptForPlayerSelection(voter, "투표할 대상을 선택하세요.", getLivingPlayers());
+			Player votedPlayer = ui.promptForPlayerSelection(voter, "투표할 대상을 선택하세요.", getAllPlayers(), false);
             voteRecords.put(voter, votedPlayer);
 
             ui.displayPrivateMessage(voter, votedPlayer.getName() + "님에게 투표했습니다.");
@@ -834,7 +836,7 @@ public class GameManager {
 			terrorTargets.remove(executedPlayer); // 자신 제외
 
 			if (!terrorTargets.isEmpty()) {
-				Player terrorTarget = ui.promptForPlayerSelection(executedPlayer, "동반 탈락시킬 대상의 번호를 입력하세요:", terrorTargets);
+				Player terrorTarget = ui.promptForPlayerSelection(executedPlayer, "동반 탈락시킬 대상의 번호를 입력하세요:", terrorTargets, false);
                 
                 ui.displayPublicMessage(executedPlayer.getName() + "님의 테러로 " + terrorTarget.getName() + "님이 함께 탈락합니다!");
                 terrorTarget.die();
@@ -956,8 +958,8 @@ public class GameManager {
      * Job 클래스들이 플레이어 입력을 받기 위해 호출할 메서드
      * 실제 입력 처리는 UI 객체에 위임
      */
-    public Player getPlayerInputForNightAction(Player actor, String prompt, List<Player> targets) {
-        return ui.promptForPlayerSelection(actor, prompt, targets);
+	public Player getPlayerInputForNightAction(Player actor, String prompt, List<Player> targets, boolean allowDeadTargets) {
+        return ui.promptForPlayerSelection(actor, prompt, targets, allowDeadTargets);
     }
 	
 	/**
@@ -1022,19 +1024,19 @@ public class GameManager {
 			return "알수없음";
 		switch (phase) {
 		case NIGHT_JOB_CONFIRM_ABILITY:
-			return "첫날 밤: 직업 확인 및 능력 사용";
+			return "첫날 밤 (직업 확인 및 능력 사용)";
 		case NIGHT_ABILITY_USE:
-			return "밤: 능력 사용";
+			return "밤 (능력 사용)";
 		case NIGHT_PRIVATE_CONFIRM:
-			return "밤: 개인 결과 확인";
+			return "밤 (개인 결과 확인)";
 		case DAY_PUBLIC_ANNOUNCEMENT:
-			return "낮: 공개 결과 발표";
+			return "낮 (공개 결과 발표)";
 		case DAY_DISCUSSION:
-			return "낮: 토론";
+			return "낮 (토론)";
 		case DAY_VOTE:
-			return "낮: 투표";
+			return "낮 (투표)";
 		case DAY_EXECUTION:
-			return "낮: 처형";
+			return "낮 (처형)";
 		case GAME_OVER:
 			return "게임 종료";
 		default:

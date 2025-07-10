@@ -37,7 +37,7 @@ public class Gangster extends Job {
 
         if (selectablePlayers.isEmpty()) return;
 
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), selectablePlayers);
+        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), selectablePlayers, false);
         if (target != null) {
             gameManager.recordNightAbilityTarget(self, target);
         }

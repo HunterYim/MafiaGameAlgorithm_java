@@ -38,7 +38,7 @@ public class Undertaker extends Job {
             return; 
         }
 
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), deadPlayers);
+        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), deadPlayers, true);
         if (target != null) {
             this.oneTimeAbilityUsed = true;
             gameManager.recordNightAbilityTarget(self, target);

@@ -39,7 +39,7 @@ public class Reporter extends Job {
 
         if (selectablePlayers.isEmpty()) return;
 
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), selectablePlayers);
+        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), selectablePlayers, false);
         if (target != null) {
             this.oneTimeAbilityUsed = true; // 사용자가 대상을 선택하면 '사용한 것'으로 간주
             gameManager.recordNightAbilityTarget(self, target);

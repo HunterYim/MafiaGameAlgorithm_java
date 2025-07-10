@@ -26,6 +26,11 @@ public class ConsoleUI implements GameUI {
             System.out.println(message);
         }
     }
+    
+    @Override
+    public void displaySystemMessage(String message) {
+        System.out.println(message);
+    }
 
     @Override
     public void clearScreen() {
@@ -46,7 +51,7 @@ public class ConsoleUI implements GameUI {
     }
 
     @Override
-    public Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets) {
+    public Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets, boolean allowDeadTargets) {
         displayPrivateMessage(actor, prompt);
         
         // "0. 아무도 선택하지 않음" 옵션
@@ -54,7 +59,9 @@ public class ConsoleUI implements GameUI {
         
         // 선택지 출력
         for (int i = 0; i < targets.size(); i++) {
-            displayPrivateMessage(actor, String.format("%d. %s", i + 1, targets.get(i).getName()));
+            Player p = targets.get(i);
+            String status = p.isAlive() ? "" : " (탈락)";
+            displayPrivateMessage(actor, String.format("%d. %s%s", i + 1, p.getName(), status));
         }
 
         while (true) {
@@ -68,7 +75,14 @@ public class ConsoleUI implements GameUI {
                 
                 int choiceIndex = choice - 1;
                 if (choiceIndex >= 0 && choiceIndex < targets.size()) {
-                    return targets.get(choiceIndex); // 유효한 선택, 선택된 Player 객체 반환
+                	Player selected = targets.get(choiceIndex);
+                    // 사망자 선택 가능 여부 체크 로직
+                    if (!selected.isAlive() && !allowDeadTargets) {
+                        displayPrivateMessage(actor, "사망한 플레이어는 선택할 수 없습니다. 다시 입력해주세요.");
+                        continue;
+                    }
+                    
+                    return selected; // 유효한 선택
                 } else {
                     displayPrivateMessage(actor, "잘못된 번호입니다. 다시 입력해주세요.");
                 }

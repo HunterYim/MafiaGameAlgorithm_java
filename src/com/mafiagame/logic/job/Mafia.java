@@ -76,12 +76,13 @@ public class Mafia extends Job {
         }
 
         // 3. UI를 통해 대상 선택 입력받기
-        List<Player> selectablePlayers = livingPlayers.stream()
-                .filter(p -> p.getCurrentTeam() != Team.MAFIA)
+        List<Player> selectablePlayers = gameManager.getAllPlayers().stream()
+                .filter(p -> !p.equals(self))
                 .collect(Collectors.toList());
+        
         if (selectablePlayers.isEmpty()) return;
 
-        Player target = gameManager.getPlayerInputForNightAction(self, finalPrompt, selectablePlayers);
+        Player target = gameManager.getPlayerInputForNightAction(self, finalPrompt, selectablePlayers, false);
         if (target == null) return;
         
         // 4. 역할에 따라 다른 기록 메서드 호출

@@ -29,7 +29,7 @@ public class Doctor extends Job {
         // 의사는 자기 자신을 포함하여 모든 생존자를 치료 가능
         if (livingPlayers.isEmpty()) return;
 
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), livingPlayers);
+        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), livingPlayers, false);
         if (target != null) {
             gameManager.recordNightAbilityTarget(self, target);
         }

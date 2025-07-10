@@ -70,7 +70,7 @@ public class Warewolf extends Job {
         
         if (attackablePlayers.isEmpty()) return;
 
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), attackablePlayers);
+        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), attackablePlayers, false);
         if (target != null) {
             gameManager.recordNightAbilityTarget(self, target);
         }

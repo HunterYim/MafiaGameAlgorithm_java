@@ -10,7 +10,8 @@ import java.util.List;
 public interface GameUI {
 	/**
      * 모든 플레이어에게 공개적으로 보여줄 메시지 출력
-     *
+     * "[전체 공지]" 같은 접두어가 붙음
+
      * @param message 공개할 메시지
      */
 	void displayPublicMessage(String message);
@@ -22,6 +23,13 @@ public interface GameUI {
      * @param message 전달할 비공개 메시지
      */
     void displayPrivateMessage(Player player, String message);
+    
+    /**
+     * 페이즈 제목 등 접두어가 필요 없는 시스템 메시지 출력
+     * 
+     * @param message 출력할 메시지
+     */
+    void displaySystemMessage(String message);
 
     /**
      * 다음 플레이어를 위해 화면을 전환하거나 이전 내용 삭제
@@ -34,7 +42,7 @@ public interface GameUI {
      * @param actor  확인을 수행할 플레이어 (null인 경우, "진행하려면..." 같은 일반 프롬프트)
      * @param prompt 안내 메시지
      */
-    Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets);
+    Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets, boolean allowDeadTargets);
 
     /**
      * 특정 플레이어에게 선택지 목록을 보여주고, 그중 하나를 선택하도록 요청
