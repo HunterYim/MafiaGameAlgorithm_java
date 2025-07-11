@@ -4,6 +4,8 @@ import com.mafiagame.logic.common.enums.JobType;
 import com.mafiagame.logic.common.enums.Team;
 import com.mafiagame.logic.game.GameManager;
 import com.mafiagame.logic.game.Player;
+import com.mafiagame.ui.GameUI;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -25,16 +27,19 @@ public class Mafia extends Job {
     @Override
     public void onAssigned(Player self, GameManager gameManager) {
         List<Player> mafiaTeam = gameManager.getAllPlayers().stream()
-                .filter(p -> p.getJob().getInitialTeam() == Team.MAFIA && !p.equals(self))
+                .filter(p -> p.getJob() instanceof Mafia && !p.equals(self))
                 .collect(Collectors.toList());
+        
+        // GameManager에서 UI 객체를 직접 가져와 메시지를 즉시 출력합니다.
+        GameUI ui = gameManager.getUi();
 
         if (mafiaTeam.isEmpty()) {
-            gameManager.recordPrivateNightResult(self, "당신 외에 다른 마피아는 없습니다.");
+            ui.displayPrivateMessage(self, "당신 외에 다른 마피아는 없습니다.");
         } else {
             String teamMates = mafiaTeam.stream()
                     .map(Player::getName)
                     .collect(Collectors.joining(", "));
-            gameManager.recordPrivateNightResult(self, "당신의 동료 마피아는 " + teamMates + " 입니다.");
+            ui.displayPrivateMessage(self, "당신의 동료 마피아는 " + teamMates + " 입니다.");
         }
     }
 
@@ -48,7 +53,11 @@ public class Mafia extends Job {
     
     @Override
     public String getNightActionPrompt(Player self, GameManager gameManager) {
-        return "공격할 대상을 선택하세요. (공격권이 없는 경우 공격 대상 추천으로 기록됩니다)";
+    	if (isAttackCommander(self, gameManager)) {
+            return "당신은 공격권이 있습니다. 공격할 대상을 선택하세요.";
+        } else {
+            return "당신은 공격권이 없습니다. 동료에게 추천할 대상을 선택하세요.";
+        }
     }
 
     @Override
@@ -76,13 +85,11 @@ public class Mafia extends Job {
         }
 
         // 3. UI를 통해 대상 선택 입력받기
-        List<Player> selectablePlayers = gameManager.getAllPlayers().stream()
-                .filter(p -> !p.equals(self))
-                .collect(Collectors.toList());
         
-        if (selectablePlayers.isEmpty()) return;
 
-        Player target = gameManager.getPlayerInputForNightAction(self, finalPrompt, selectablePlayers, false);
+        
+        Player target = gameManager.getPlayerInputForNightAction(self, finalPrompt, gameManager.getAllPlayers(), false);
+        
         if (target == null) return;
         
         // 4. 역할에 따라 다른 기록 메서드 호출
@@ -124,7 +131,7 @@ public class Mafia extends Job {
         
         if (target.getJob() instanceof Soldier) {
             Soldier soldierJob = (Soldier) target.getJob();
-            if (soldierJob.tryActivateDefense()) {
+            if (soldierJob.tryActivateDefense(target, gameManager)) {
                 gameManager.addPublicAnnouncement(target.getName() + "님이 마피아의 공격을 받았으나, 군인의 방어 능력으로 살아남았습니다!");
                 return;
             }

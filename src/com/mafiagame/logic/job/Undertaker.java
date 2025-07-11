@@ -32,16 +32,23 @@ public class Undertaker extends Job {
 
     @Override
     public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
-        List<Player> deadPlayers = gameManager.getDeadPlayers();
-        if (deadPlayers.isEmpty()) {
-            // 이 경우는 canUseAbility에서 걸러지지만, 안전을 위해 추가
-            return; 
-        }
+    	while (true) {
+            Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), gameManager.getAllPlayers(), true);
+            
+            if (target == null) {
+                // 아무도 선택하지 않은 경우 루프 종료
+                break;
+            }
 
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), deadPlayers, true);
-        if (target != null) {
-            this.oneTimeAbilityUsed = true;
+            // 유효성 검사: 자신을 선택했는지 확인
+            if (target.equals(self)) {
+                gameManager.getUi().displayPrivateMessage(self, "자기 자신은 부검할 수 없습니다. 다시 선택해주세요.");
+                continue; // 다시 선택하도록 루프 처음으로
+            }
+            
+            // 유효성 검사를 통과한 경우
             gameManager.recordNightAbilityTarget(self, target);
+            break; // 루프 종료
         }
     }
 }

@@ -33,16 +33,23 @@ public class Reporter extends Job {
 
     @Override
     public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
-        List<Player> selectablePlayers = livingPlayers.stream()
-                .filter(p -> !p.equals(self))
-                .collect(Collectors.toList());
+    	while (true) {
+            Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), gameManager.getAllPlayers(), false);
+            
+            if (target == null) {
+                // 아무도 선택하지 않은 경우 루프 종료
+                break;
+            }
 
-        if (selectablePlayers.isEmpty()) return;
-
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), selectablePlayers, false);
-        if (target != null) {
-            this.oneTimeAbilityUsed = true; // 사용자가 대상을 선택하면 '사용한 것'으로 간주
+            // 유효성 검사: 자신을 선택했는지 확인
+            if (target.equals(self)) {
+                gameManager.getUi().displayPrivateMessage(self, "자기 자신은 취재할 수 없습니다. 다시 선택해주세요.");
+                continue; // 다시 선택하도록 루프 처음으로
+            }
+            
+            // 유효성 검사를 통과한 경우
             gameManager.recordNightAbilityTarget(self, target);
+            break; // 루프 종료
         }
     }
 }

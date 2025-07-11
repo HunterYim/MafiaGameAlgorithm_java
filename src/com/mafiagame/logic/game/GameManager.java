@@ -28,7 +28,6 @@ public class GameManager {
 	private int dayCount;			// 현재 날짜
 	private boolean isGameOver;		// 게임 종료 여부
 	private Team winningTeam;		// 승리 팀
-	private int currentPlayerIndex; // 현재 턴을 진행 중인 플레이어의 인덱스 (텍스트용)
 	private Random random;			// 직업 랜덤 배정 등에 사용
 
 	// 게임 상태 기록 Maps & Lists
@@ -58,6 +57,9 @@ public class GameManager {
 	
 	// 밤 턴을 진행할 플레이어 목록
     private List<Player> playersForNightTurn;
+    
+    // 공개적으로 밝혀진 직업 정보 저장 (플레이어, 직업 타입)
+    private Map<Player, JobType> revealedJobs;
 
 
 	public GameManager(GameUI ui) {
@@ -71,9 +73,9 @@ public class GameManager {
 		this.executedPlayersToday = new ArrayList<>();
 		this.mafiaNominations = new HashMap<>();
 		this.playersForNightTurn = new ArrayList<>();
+        this.revealedJobs = new HashMap<>();
 		this.dayCount = 1; // 1일차부터 시작
 		this.isGameOver = false;
-		this.currentPlayerIndex = 0; // 첫 번째 플레이어부터 시작
 		this.random = new Random();
 	}
 
@@ -96,13 +98,6 @@ public class GameManager {
 
 		// 2. 직업 목록 생성 및 배정
 		assignJobs();
-
-		// 3. 직업 배정 후 각 플레이어에게 onAssigned 호출 (예: 마피아 동료 인지)
-		for (Player player : this.players) {
-			if (player.getJob() != null) {
-				player.getJob().onAssigned(player, this);
-			}
-		}
 
 		ui.displayPublicMessage("게임 설정이 완료되었습니다. 총 " + playerCount + "명의 플레이어, 모드: " + gameMode);
 		for (Player p : players) {
@@ -487,8 +482,9 @@ public class GameManager {
 			Job currentJob = currentPlayer.getJob();
 			ui.displayPrivateMessage(currentPlayer, "당신의 직업은 [" + currentJob.getJobName() + "] 입니다.");
 
-			// 마피아 동료 확인은 Job의 onAssigned에서 처리되도록 위임
-            // GameManager는 setupGame에서 onAssigned를 호출
+			if (currentJob != null) {
+				currentJob.onAssigned(currentPlayer, this);
+			}
 			
 			handlePlayerNightActionTurn(currentPlayer);
 
@@ -718,10 +714,24 @@ public class GameManager {
 				continue;
 			}
 
-			Player votedPlayer = ui.promptForPlayerSelection(voter, "투표할 대상을 선택하세요.", getAllPlayers(), false);
-            voteRecords.put(voter, votedPlayer);
+			while (true) {
+	            Player votedPlayer = ui.promptForPlayerSelection(voter, "투표할 대상을 선택하세요.", getAllPlayers(), false, this);
 
-            ui.displayPrivateMessage(voter, votedPlayer.getName() + "님에게 투표했습니다.");
+	            if (votedPlayer != null && votedPlayer.equals(voter)) {
+	                ui.displayPrivateMessage(voter, "자기 자신에게는 투표할 수 없습니다. 다시 선택해주세요.");
+	                continue;
+	            }
+	            
+	            // 유효성 검사 통과
+	            if (votedPlayer != null) {
+	                voteRecords.put(voter, votedPlayer);
+	                ui.displayPrivateMessage(voter, votedPlayer.getName() + "님에게 투표했습니다.");
+	            } else {
+	                voteRecords.put(voter, null);
+	                ui.displayPrivateMessage(voter, "기권했습니다.");
+	            }
+	            break; // 루프 종료
+			}
             ui.waitForPlayerConfirmation(voter, "투표 완료. Enter 키를 누르고 넘기세요.");
             ui.clearScreen();
         }
@@ -794,7 +804,7 @@ public class GameManager {
             // 정치인의 '처세' 능력 발동 여부 확인
             if (executedPlayer.getJob() instanceof Politician) {
                 Politician politicianJob = (Politician) executedPlayer.getJob();
-                if (politicianJob.tryEvadeExecution()) {
+                if (politicianJob.tryEvadeExecution(executedPlayer, this)) {
                     ui.displayPublicMessage(executedPlayer.getName() + "님은 정치인의 처세 능력으로 추방을 면했습니다! 직업은 [정치인] 입니다.");
                     // 추방이 무효화되었으므로, 여기서 메서드 실행을 종료
                     voteRecords.clear(); // 투표 기록만 초기화하고 종료
@@ -836,7 +846,7 @@ public class GameManager {
 			terrorTargets.remove(executedPlayer); // 자신 제외
 
 			if (!terrorTargets.isEmpty()) {
-				Player terrorTarget = ui.promptForPlayerSelection(executedPlayer, "동반 탈락시킬 대상의 번호를 입력하세요:", terrorTargets, false);
+				Player terrorTarget = ui.promptForPlayerSelection(executedPlayer, "동반 탈락시킬 대상의 번호를 입력하세요:", terrorTargets, false, this);
                 
                 ui.displayPublicMessage(executedPlayer.getName() + "님의 테러로 " + terrorTarget.getName() + "님이 함께 탈락합니다!");
                 terrorTarget.die();
@@ -908,6 +918,10 @@ public class GameManager {
 
 	// --- 헬퍼(유틸리티) 메서드 ---
 
+	public GameUI getUi() {
+		return this.ui;
+	}
+	
 	public int getDayCount() {
 		return dayCount;
 	}
@@ -959,7 +973,7 @@ public class GameManager {
      * 실제 입력 처리는 UI 객체에 위임
      */
 	public Player getPlayerInputForNightAction(Player actor, String prompt, List<Player> targets, boolean allowDeadTargets) {
-        return ui.promptForPlayerSelection(actor, prompt, targets, allowDeadTargets);
+        return ui.promptForPlayerSelection(actor, prompt, targets, allowDeadTargets, this);
     }
 	
 	/**
@@ -989,6 +1003,27 @@ public class GameManager {
 	}
 	
 	/**
+     * 특정 플레이어의 직업을 게임 전체에 공개적으로 밝힘
+     * 
+     * @param player 직업을 공개할 플레이어
+     */
+    public void revealJob(Player player) {
+        if (player != null && player.getJob() != null) {
+            this.revealedJobs.put(player, player.getJob().getJobType());
+        }
+    }
+    
+    /**
+     * 특정 플레이어의 직업이 공개되었는지 확인하고, 공개되었다면 직업 타입을 반환
+     * 
+     * @param player 확인할 플레이어
+     * @return 공개된 JobType, 없으면 null
+     */
+    public JobType getRevealedJob(Player player) {
+        return this.revealedJobs.get(player);
+    }
+	
+	/**
 	 * (마피아용) 실시간 지명 내용을 기록
 	 * 
 	 * @param nominator 지명한 마피아
@@ -1014,6 +1049,74 @@ public class GameManager {
      */
     public void addPublicAnnouncement(String message) {
         this.publicAnnouncements.add(message);
+    }
+    
+    /**
+     * UI에 표시될 특정 플레이어의 상세 정보 목록 반환
+     * 
+     * @param actor 정보를 보려는 주체 (선택하는 사람)
+     * @param target 정보가 표시될 대상 플레이어
+     * @return 상세 정보 문자열 리스트
+     */
+    public List<String> getPlayerDisplayDetails(Player actor, Player target) {
+        List<String> details = new ArrayList<>();
+
+        // 1. 자기 자신인지 확인
+        if (actor.equals(target)) {
+            details.add("본인");
+        }
+
+        // 2. 공개적으로 밝혀진 직업이 있는지 확인
+        JobType revealedJob = getRevealedJob(target);
+        if (revealedJob != null) {
+            details.add(revealedJob.name());
+        }
+        // 3. 직업이 공개되지 않았고, 같은 팀일 경우 직업 정보 추가
+        else if (actor.getCurrentTeam() == target.getCurrentTeam() && !actor.equals(target)) {
+        	Job actorJob = actor.getJob();
+            Job targetJob = target.getJob();
+            boolean showJob = false;
+
+         // Case 1: 내가 '마피아'일 때
+            if (actorJob instanceof Mafia) {
+                if (targetJob instanceof Mafia) {
+                    showJob = true; // 다른 마피아의 직업은 항상 본다.
+                } else if (targetJob instanceof Informant) {
+                    showJob = ((Informant) targetJob).hasContacted(); // 정보원은 접선해야만 본다.
+                } else if (targetJob instanceof Warewolf) {
+                    showJob = ((Warewolf) targetJob).hasContacted(); // 늑대인간도 접선해야만 본다.
+                }
+            }
+            // Case 2: 내가 '정보원'일 때
+            else if (actorJob instanceof Informant) {
+                // 나는 '접선'을 해야만 다른 팀원의 직업을 볼 수 있다.
+                if (((Informant) actorJob).hasContacted()) {
+                    showJob = true;
+                }
+            }
+            // Case 3: 내가 '늑대인간'일 때
+            else if (actorJob instanceof Warewolf) {
+                // 나도 '접선'을 해야만 다른 팀원의 직업을 볼 수 있다.
+                if (((Warewolf) actorJob).hasContacted()) {
+                    showJob = true;
+                }
+            }
+            // Case 4: 내가 '간첩 팀'일 때 (예: 간첩)
+            else if (actor.getCurrentTeam() == Team.SPY) {
+                showJob = true; // 간첩 팀은 서로의 직업을 항상 본다.
+            }
+
+            if (showJob) {
+                details.add(targetJob.getJobType().name());
+            }
+        }
+        
+        // 4. 탈락 여부 추가
+        if (!target.isAlive()) {
+            details.add("탈락");
+        }
+
+        return details;
     }
 	
     /**

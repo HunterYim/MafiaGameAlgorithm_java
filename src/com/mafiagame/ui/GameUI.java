@@ -1,5 +1,6 @@
 package com.mafiagame.ui;
 
+import com.mafiagame.logic.game.GameManager;
 import com.mafiagame.logic.game.Player;
 import java.util.List;
 
@@ -42,8 +43,7 @@ public interface GameUI {
      * @param actor  확인을 수행할 플레이어 (null인 경우, "진행하려면..." 같은 일반 프롬프트)
      * @param prompt 안내 메시지
      */
-    Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets, boolean allowDeadTargets);
-
+    Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets, boolean allowDeadTargets, GameManager gameManager);
     /**
      * 특정 플레이어에게 선택지 목록을 보여주고, 그중 하나를 선택하도록 요청
      * 입력값이 유효할 때까지 반복하여 올바른 선택 보장

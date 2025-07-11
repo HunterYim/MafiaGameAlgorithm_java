@@ -1,6 +1,11 @@
 package com.mafiagame.ui;
 
+import com.mafiagame.logic.common.enums.JobType;
+import com.mafiagame.logic.common.enums.Team;
+import com.mafiagame.logic.game.GameManager;
 import com.mafiagame.logic.game.Player;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
@@ -51,7 +56,7 @@ public class ConsoleUI implements GameUI {
     }
 
     @Override
-    public Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets, boolean allowDeadTargets) {
+    public Player promptForPlayerSelection(Player actor, String prompt, List<Player> targets, boolean allowDeadTargets, GameManager gameManager) {
         displayPrivateMessage(actor, prompt);
         
         // "0. 아무도 선택하지 않음" 옵션
@@ -60,8 +65,26 @@ public class ConsoleUI implements GameUI {
         // 선택지 출력
         for (int i = 0; i < targets.size(); i++) {
             Player p = targets.get(i);
-            String status = p.isAlive() ? "" : " (탈락)";
-            displayPrivateMessage(actor, String.format("%d. %s%s", i + 1, p.getName(), status));
+            
+            List<String> details = gameManager.getPlayerDisplayDetails(actor, p);            
+            JobType revealedJob = gameManager.getRevealedJob(p);
+
+            // 1. 공개된 직업 정보 추가
+            if (revealedJob != null) {
+                details.add(revealedJob.name());
+            } 
+            // 2. (직업이 안 밝혀졌고) 같은 팀원인 경우 정보 추가
+            else if (actor.getCurrentTeam() == p.getCurrentTeam() && !actor.equals(p) && p.isAlive()) {
+                if (p.getCurrentTeam() == Team.SPY) details.add("팀원");
+            }
+            
+            // 3. 탈락 여부 추가
+            if (!p.isAlive()) {
+                details.add("탈락");
+            }
+            
+            String info = details.isEmpty() ? "" : " (" + String.join(", ", details) + ")";
+            displayPrivateMessage(actor, String.format("%d. %s%s", i + 1, p.getName(), info));
         }
 
         while (true) {

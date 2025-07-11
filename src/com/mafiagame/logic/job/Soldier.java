@@ -34,15 +34,17 @@ public class Soldier extends Job {
 
     /**
      * 마피아나 늑대인간의 공격을 받았을 때 호출되는 방어 로직
-     * 1회성 능력: 아직 사용하지 않았다면 방어에 성공, 사용했다고 표시
      * 
+     * @param self 이 직업을 가진 플레이어 객체
+     * @param gameManager 게임 매니저 객체
      * @return 방어에 성공하면 true, 실패하면(이미 사용해서) false
      */
-    public boolean tryActivateDefense() {
+    public boolean tryActivateDefense(Player self, GameManager gameManager) {
         if (!this.oneTimeAbilityUsed) {
-            this.oneTimeAbilityUsed = true; // 1회성 능력 사용으로 상태 변경
-            return true; // 방어 성공
+            this.oneTimeAbilityUsed = true;
+            gameManager.revealJob(self);
+            return true;
         }
-        return false; // 이미 능력을 사용했으므로 방어 실패
+        return false;
     }
 }

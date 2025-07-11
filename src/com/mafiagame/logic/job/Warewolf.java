@@ -22,6 +22,10 @@ public class Warewolf extends Job {
         super(JOB_NAME, TEAM, JOB_TYPE, DESCRIPTION, HAS_NIGHT_ABILITY, IS_ONE_TIME_ABILITY);
     }
     
+    public boolean hasContacted() {
+        return this.hasContacted;
+    }
+    
     @Override
     public String getNightActionPrompt(Player self, GameManager gameManager) {
         return "살육할 대상을 선택하세요. (치료 무시)";
@@ -87,7 +91,7 @@ public class Warewolf extends Job {
         
         if (target.getJob() instanceof Soldier) {
             Soldier soldierJob = (Soldier) target.getJob();
-            if (soldierJob.tryActivateDefense()) {
+            if (soldierJob.tryActivateDefense(target, gameManager)) {
                 gameManager.addPublicAnnouncement(target.getName() + "님이 늑대인간의 살육을 당했으나, 군인의 방어 능력으로 살아남았습니다!");
                 return;
             }

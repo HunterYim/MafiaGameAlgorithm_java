@@ -39,15 +39,17 @@ public class Politician extends Job {
 
     /**
      * '처세' 능력을 사용하여 처형 회피
-     * 이 메서드는 GameManager의 processDayExecutionPhase에서 호출
      * 
+     * @param self 이 직업을 가진 플레이어 객체
+     * @param gameManager 게임 매니저 객체
      * @return 처세 능력 발동에 성공하면 true, 실패하면 false
      */
-    public boolean tryEvadeExecution() {
+    public boolean tryEvadeExecution(Player self, GameManager gameManager) {
         if (!this.oneTimeAbilityUsed) {
-            this.oneTimeAbilityUsed = true; // 1회성 능력 사용으로 상태 변경
-            return true; // 능력 발동 성공
+            this.oneTimeAbilityUsed = true;
+            gameManager.revealJob(self);
+            return true;
         }
-        return false; // 이미 사용해서 실패
+        return false;
     }
 }

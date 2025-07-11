@@ -27,18 +27,22 @@ public class Police extends Job {
 
     @Override
     public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
-        List<Player> selectablePlayers = livingPlayers.stream()
-                .filter(p -> !p.equals(self))
-                .collect(Collectors.toList());
+    	while (true) {
+            Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), gameManager.getAllPlayers(), false);
+            
+            if (target == null) {
+                break;
+            }
 
-        if (selectablePlayers.isEmpty()) {
-            // 선택할 플레이어가 없는 경우 (매우 드문 케이스)
-            return;
-        }
-
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), selectablePlayers, false);
-        if (target != null) {
+            // 유효성 검사: 자신을 선택했는지 확인
+            if (target.equals(self)) {
+                gameManager.getUi().displayPrivateMessage(self, "자기 자신은 조사할 수 없습니다. 다시 선택해주세요.");
+                continue; // 다시 선택하도록 루프 처음으로
+            }
+            
+            // 유효성 검사를 통과한 경우
             gameManager.recordNightAbilityTarget(self, target);
+            break; // 루프 종료
         }
     }
 
