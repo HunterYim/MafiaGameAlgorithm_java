@@ -71,22 +71,27 @@ public class Informant extends Job {
         if (!hasContacted && target.getJob().getInitialTeam() == Team.MAFIA) {
             this.hasContacted = true;
 
-            // 정보원에게 접선 성공 및 팀원 정보 전달
-            List<Player> mafiaTeam = gameManager.getLivingPlayers().stream()
+            List<Player> livingMafiaTeam = gameManager.getLivingPlayers().stream()
                     .filter(p -> p.getCurrentTeam() == Team.MAFIA)
                     .collect(Collectors.toList());
-            String teamMates = mafiaTeam.stream().map(Player::getName).collect(Collectors.joining(", "));
-            gameManager.recordPrivateNightResult(user, target.getName() + "님과 접선에 성공했습니다! 당신의 팀원은 " + teamMates + " 입니다.");
 
-            // 다른 마피아들에게 정보원 접선 사실 알림
-            for (Player mafia : mafiaTeam) {
-                if (!mafia.equals(user)) {
-                    gameManager.recordPrivateNightResult(mafia, "정보원 " + user.getName() + "이(가) 우리 팀에 합류했습니다.");
+            String teamMatesNames = livingMafiaTeam.stream()
+                    .filter(p -> !p.equals(user))
+                    .map(Player::getName)
+                    .collect(Collectors.joining(", "));
+            
+            String messageForInformant = target.getName() + "님과 접선에 성공했습니다! 당신의 동료는 " + teamMatesNames + " 입니다.";
+            gameManager.recordPrivateNightResult(user, messageForInformant);
+
+            String messageForMafia = "정보원 " + user.getName() + "이(가) 우리 팀에 합류했습니다.";
+            for (Player mafiaMember : livingMafiaTeam) {
+                if (!mafiaMember.equals(user)) {
+                    gameManager.recordPrivateNightResult(mafiaMember, messageForMafia);
                 }
             }
         }
         
-        // 대상이 마피아가 아닌 경우 '첩보'
+        // 대상이 마피아 팀이 아닌 경우 '첩보'
         else {
             gameManager.recordPrivateNightResult(user, target.getName() + "님의 직업은 [" + target.getJob().getJobName() + "] 입니다.");
         }

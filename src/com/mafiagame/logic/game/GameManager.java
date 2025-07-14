@@ -590,25 +590,32 @@ public class GameManager {
         if (dayCount != 1) return;
 
         Player graveRobber = getPlayerByJob(GraveRobber.class);
-        // 도굴꾼이 없거나, 죽었거나, 첫날 밤에 아무도 죽지 않았다면 발동 안함
-        if (graveRobber == null || !graveRobber.isAlive() || diedThisNight.isEmpty()) return;
+        if (graveRobber == null || !graveRobber.isAlive()) return;
 
-        // 공격으로 죽은 첫 번째 플레이어를 대상으로 함
-        Player firstDead = diedThisNight.get(0);
+        // ▼▼▼ 성공/실패 분기 로직 수정 ▼▼▼
         
-        // 직업을 훔침
-        Job stolenJob = firstDead.getJob();
-        graveRobber.setJob(stolenJob);
-        
-        // 도굴꾼에게 알림
-        String message = "당신은 " + firstDead.getName() + "님의 직업인 [" + stolenJob.getJobName() + "]을 훔쳤습니다!";
-        recordPrivateNightResult(graveRobber, message);
+        // Case 1: 첫날 밤에 '공격으로' 죽은 사람이 있는 경우 (성공)
+        if (!diedThisNight.isEmpty()) {
+            Player firstDead = diedThisNight.get(0);
+            Job stolenJob = firstDead.getJob();
+            
+            // 직업을 훔침 (setJob이 currentTeam까지 함께 변경해 줌)
+            graveRobber.setJob(stolenJob);
+            
+            // 도굴꾼에게 성공 알림
+            String message = "당신은 [" + stolenJob.getJobName() + "] 직업을 훔쳤습니다!";
+            recordPrivateNightResult(graveRobber, message);
+
+        // Case 2: 아무도 죽지 않은 경우 (실패)
+        } else {
+            // 도굴꾼에게 실패 알림
+            String message = "아무 직업을 훔치지 못했습니다.";
+            recordPrivateNightResult(graveRobber, message);
+        }
     }
     
     // 유틸리티 메서드: 사망 공지가 이미 되었는지 확인 (중복 공지 방지용)
     private boolean isDeathAnnounced(Player player) {
-        String deathMessage1 = player.getName() + "님이 밤 사이 사망했습니다.";
-        String deathMessage2 = "늑대인간의 습격으로 " + player.getName() + "님이 살해당했습니다!";
         return publicAnnouncements.stream().anyMatch(ann -> ann.contains(player.getName()));
     }
     
@@ -622,10 +629,17 @@ public class GameManager {
 
 			// GameManager에 저장된 해당 플레이어의 밤 결과 정보를 가져옴
 			Object resultInfo = nightResultsForPrivateConfirmation.get(currentPlayer);
-			String privateMessage = currentPlayer.getJob().getPrivateNightResultMessage(currentPlayer, resultInfo, this); // Job에서 직접 메시지 생성
+			String finalMessage = null;
+			
+			if (resultInfo instanceof String) {
+				finalMessage = (String) resultInfo;
+			} 
+			else if (resultInfo != null) {
+				finalMessage = currentPlayer.getJob().getPrivateNightResultMessage(currentPlayer, resultInfo, this);
+			}
 
-			if (privateMessage != null && !privateMessage.isEmpty()) {
-				ui.displayPrivateMessage(currentPlayer, privateMessage);
+			if (finalMessage != null && !finalMessage.isEmpty()) {
+				ui.displayPrivateMessage(currentPlayer, finalMessage);
 			} else {
 				ui.displayPrivateMessage(currentPlayer, "특별한 개인 결과가 없습니다.");
 			}
@@ -633,8 +647,7 @@ public class GameManager {
 			ui.waitForPlayerConfirmation(currentPlayer, "확인 후 Enter 키를 누르고 다음 사람에게 넘기세요.");
 			ui.clearScreen();
 		}
-		nightResultsForPrivateConfirmation.clear(); // 확인 후 초기화
-
+		nightResultsForPrivateConfirmation.clear();
 	}
 
 	/**

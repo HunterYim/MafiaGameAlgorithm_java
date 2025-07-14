@@ -8,7 +8,6 @@ import com.mafiagame.ui.ConsoleUI;
 public class MainGame {
 
 	public static void main(String[] args) {
-        System.out.println("main 함수 시작");
 
         // 1. UI 구현체 먼저 생성
         ConsoleUI consoleUI = new ConsoleUI();
@@ -18,7 +17,7 @@ public class MainGame {
 
         // 3. 게임 설정 및 시작
         // 예: 8인 클래식 모드
-        gameManager.setupGame(8, GameMode.CLASSIC);
+        gameManager.setupGame(12, GameMode.SPY);
         gameManager.startGame();
         
         // 4. 게임이 모두 끝나면 UI 리소스 해제

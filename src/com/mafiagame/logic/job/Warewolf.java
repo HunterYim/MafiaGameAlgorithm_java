@@ -40,14 +40,25 @@ public class Warewolf extends Job {
         this.hasContacted = true;
 
         gameManager.addPublicAnnouncement("마피아가 누군가를 공격했지만 아무 일도 일어나지 않았습니다...");
+        
+        List<Player> livingMafiaTeam = gameManager.getLivingPlayers().stream()
+                .filter(p -> p.getCurrentTeam() == Team.MAFIA)
+                .collect(Collectors.toList());
+        
+        String teamMatesNames = livingMafiaTeam.stream()
+                .filter(p -> !p.equals(self))
+                .map(Player::getName)
+                .collect(Collectors.joining(", "));
+        
+        String messageForWerewolf = "마피아 " + attacker.getName() + "의 공격을 받아 접선했습니다! 당신의 새로운 동료는 " + teamMatesNames + " 입니다.";
+        gameManager.recordPrivateNightResult(self, messageForWerewolf);
 
-        // 늑대인간에게 접선 사실 알림
-        gameManager.recordPrivateNightResult(self, "마피아 " + attacker.getName() + "의 공격을 받아 접선했습니다!");
-
-        // 모든 마피아에게 늑대인간 접선 사실 알림
-        gameManager.getLivingPlayers().stream()
-            .filter(p -> p.getCurrentTeam() == Team.MAFIA && p.getJob() instanceof Mafia)
-            .forEach(mafia -> gameManager.recordPrivateNightResult(mafia, "우리의 공격 대상은 늑대인간이었습니다! " + self.getName() + "이(가) 팀에 합류합니다."));
+        String messageForMafia = "우리의 공격 대상은 늑대인간이었습니다! 늑대인간 " + self.getName() + "이(가) 팀에 합류합니다.";
+        for (Player mafiaMember : livingMafiaTeam) {
+            if (!mafiaMember.equals(self)) {
+                 gameManager.recordPrivateNightResult(mafiaMember, messageForMafia);
+            }
+        }
     }
 
     /**
