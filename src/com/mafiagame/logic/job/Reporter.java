@@ -37,19 +37,19 @@ public class Reporter extends Job {
             Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), gameManager.getAllPlayers(), false);
             
             if (target == null) {
-                // 아무도 선택하지 않은 경우 루프 종료
                 break;
             }
 
             // 유효성 검사: 자신을 선택했는지 확인
             if (target.equals(self)) {
                 gameManager.getUi().displayPrivateMessage(self, "자기 자신은 취재할 수 없습니다. 다시 선택해주세요.");
-                continue; // 다시 선택하도록 루프 처음으로
+                continue;
             }
             
             // 유효성 검사를 통과한 경우
+            this.markOneTimeAbilityUsed();
             gameManager.recordNightAbilityTarget(self, target);
-            break; // 루프 종료
+            break;
         }
     }
 }

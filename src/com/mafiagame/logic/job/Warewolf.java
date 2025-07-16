@@ -41,11 +41,11 @@ public class Warewolf extends Job {
 
         gameManager.addPublicAnnouncement("마피아가 누군가를 공격했지만 아무 일도 일어나지 않았습니다...");
         
-        List<Player> livingMafiaTeam = gameManager.getLivingPlayers().stream()
-                .filter(p -> p.getCurrentTeam() == Team.MAFIA)
+        List<Player> allMafiaTeamMembers  = gameManager.getAllPlayers().stream()
+                .filter(p -> p.getJob().getInitialTeam() == Team.MAFIA)
                 .collect(Collectors.toList());
         
-        String teamMatesNames = livingMafiaTeam.stream()
+        String teamMatesNames = allMafiaTeamMembers .stream()
                 .filter(p -> !p.equals(self))
                 .map(Player::getName)
                 .collect(Collectors.joining(", "));
@@ -54,7 +54,7 @@ public class Warewolf extends Job {
         gameManager.recordPrivateNightResult(self, messageForWerewolf);
 
         String messageForMafia = "우리의 공격 대상은 늑대인간이었습니다! 늑대인간 " + self.getName() + "이(가) 팀에 합류합니다.";
-        for (Player mafiaMember : livingMafiaTeam) {
+        for (Player mafiaMember : allMafiaTeamMembers ) {
             if (!mafiaMember.equals(self)) {
                  gameManager.recordPrivateNightResult(mafiaMember, messageForMafia);
             }
@@ -79,15 +79,19 @@ public class Warewolf extends Job {
     @Override
     public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
         // canUseAbility가 true일 때만 호출됨
-        List<Player> attackablePlayers = livingPlayers.stream()
-                .filter(p -> !p.equals(self))
-                .collect(Collectors.toList());
-        
-        if (attackablePlayers.isEmpty()) return;
+    	while (true) {
+            Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), gameManager.getAllPlayers(), false);
+            
+            if (target == null) break; // 선택 안 함
 
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), attackablePlayers, false);
-        if (target != null) {
+            if (target.equals(self)) {
+                gameManager.getUi().displayPrivateMessage(self, "자기 자신은 살육할 수 없습니다. 다시 선택해주세요.");
+                continue;
+            }
+            
+            // 유효성 검사 통과
             gameManager.recordNightAbilityTarget(self, target);
+            break;
         }
     }
 

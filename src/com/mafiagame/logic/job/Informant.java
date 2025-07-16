@@ -71,11 +71,11 @@ public class Informant extends Job {
         if (!hasContacted && target.getJob().getInitialTeam() == Team.MAFIA) {
             this.hasContacted = true;
 
-            List<Player> livingMafiaTeam = gameManager.getLivingPlayers().stream()
-                    .filter(p -> p.getCurrentTeam() == Team.MAFIA)
+            List<Player> allMafiaTeamMembers  = gameManager.getAllPlayers().stream()
+                    .filter(p -> p.getJob().getInitialTeam() == Team.MAFIA)
                     .collect(Collectors.toList());
-
-            String teamMatesNames = livingMafiaTeam.stream()
+            
+            String teamMatesNames = allMafiaTeamMembers .stream()
                     .filter(p -> !p.equals(user))
                     .map(Player::getName)
                     .collect(Collectors.joining(", "));
@@ -84,7 +84,7 @@ public class Informant extends Job {
             gameManager.recordPrivateNightResult(user, messageForInformant);
 
             String messageForMafia = "정보원 " + user.getName() + "이(가) 우리 팀에 합류했습니다.";
-            for (Player mafiaMember : livingMafiaTeam) {
+            for (Player mafiaMember : allMafiaTeamMembers ) {
                 if (!mafiaMember.equals(user)) {
                     gameManager.recordPrivateNightResult(mafiaMember, messageForMafia);
                 }

@@ -121,11 +121,7 @@ public class Mafia extends Job {
         }
 
         if (target.isHealedByDoctor()) {
-            gameManager.addPublicAnnouncement(target.getName() + "님이 마피아의 공격을 받았지만, 의사의 치료로 생존했습니다!");
-            gameManager.getAllPlayers().stream()
-                .filter(p -> p.getJob() instanceof Doctor && p.isAlive())
-                .findFirst()
-                .ifPresent(doctor -> gameManager.recordPrivateNightResult(doctor, target.getName() + "님을 성공적으로 치료했습니다!"));
+            gameManager.addPublicAnnouncement(target.getName() + "님이 마피아의 공격을 받았지만, 의사의 치료로 생존했습니다!");            
             return;
         }
         

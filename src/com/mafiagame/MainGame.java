@@ -17,7 +17,7 @@ public class MainGame {
 
         // 3. 게임 설정 및 시작
         // 예: 8인 클래식 모드
-        gameManager.setupGame(12, GameMode.SPY);
+        gameManager.setupGame(8, GameMode.CLASSIC);
         gameManager.startGame();
         
         // 4. 게임이 모두 끝나면 UI 리소스 해제

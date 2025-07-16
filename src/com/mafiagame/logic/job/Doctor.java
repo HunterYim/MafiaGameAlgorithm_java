@@ -27,7 +27,7 @@ public class Doctor extends Job {
     @Override
     public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
         // 의사는 자기 자신을 포함하여 모든 생존자를 치료 가능
-        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), livingPlayers, false);
+        Player target = gameManager.getPlayerInputForNightAction(self, getNightActionPrompt(self, gameManager), gameManager.getAllPlayers(), false);
         if (target != null) {
             gameManager.recordNightAbilityTarget(self, target);
         }

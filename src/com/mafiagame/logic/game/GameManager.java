@@ -60,6 +60,9 @@ public class GameManager {
     
     // 공개적으로 밝혀진 직업 정보 저장 (플레이어, 직업 타입)
     private Map<Player, JobType> revealedJobs;
+    
+    // 기자, 장의사 등 다음 날 아침에 공개될 능력 기록용
+    private List<Map.Entry<Player, Player>> delayedNightActions;
 
 
 	public GameManager(GameUI ui) {
@@ -74,6 +77,7 @@ public class GameManager {
 		this.mafiaNominations = new HashMap<>();
 		this.playersForNightTurn = new ArrayList<>();
         this.revealedJobs = new HashMap<>();
+        this.delayedNightActions = new ArrayList<>();
 		this.dayCount = 1; // 1일차부터 시작
 		this.isGameOver = false;
 		this.random = new Random();
@@ -570,11 +574,19 @@ public class GameManager {
                 }
             }
         }
+        
+        // 5. 다음 날 아침에 공개될 행동들(기자, 장의사)을 별도 리스트에 백업
+        for (Map.Entry<Player, Player> entry : nightAbilityTargets.entrySet()) {
+            Job userJob = entry.getKey().getJob();
+            if (userJob instanceof Reporter || userJob instanceof Undertaker) {
+                this.delayedNightActions.add(entry);
+            }
+        }
 
-        // 5. 도굴꾼 능력 처리
+        // 6. 도굴꾼 능력 처리
         handleGraveRobberAbility(diedThisNight);
         
-        // 6. 사망자 최종 공지
+        // 7. 사망자 최종 공지
         for(Player deadPlayer : diedThisNight){
             addPublicAnnouncement(deadPlayer.getName() + "님이 밤 사이 사망했습니다.");
        }
@@ -591,9 +603,7 @@ public class GameManager {
 
         Player graveRobber = getPlayerByJob(GraveRobber.class);
         if (graveRobber == null || !graveRobber.isAlive()) return;
-
-        // ▼▼▼ 성공/실패 분기 로직 수정 ▼▼▼
-        
+   
         // Case 1: 첫날 밤에 '공격으로' 죽은 사람이 있는 경우 (성공)
         if (!diedThisNight.isEmpty()) {
             Player firstDead = diedThisNight.get(0);
@@ -603,13 +613,13 @@ public class GameManager {
             graveRobber.setJob(stolenJob);
             
             // 도굴꾼에게 성공 알림
-            String message = "당신은 [" + stolenJob.getJobName() + "] 직업을 훔쳤습니다!";
+            String message = "당신은 [" + stolenJob.getJobName() + "] 직업을 얻었습니다!";
             recordPrivateNightResult(graveRobber, message);
 
         // Case 2: 아무도 죽지 않은 경우 (실패)
         } else {
             // 도굴꾼에게 실패 알림
-            String message = "아무 직업을 훔치지 못했습니다.";
+            String message = "아무 직업을 얻지 못했습니다.";
             recordPrivateNightResult(graveRobber, message);
         }
     }
@@ -677,7 +687,7 @@ public class GameManager {
      */
     private void handleDelayedPublicAnnouncements() {
         // nightAbilityTargets에 기록된 모든 밤 행동을 확인
-        for (Map.Entry<Player, Player> entry : nightAbilityTargets.entrySet()) {
+        for (Map.Entry<Player, Player> entry : this.delayedNightActions) {
             Player user = entry.getKey();
             Player target = entry.getValue();
 
@@ -693,12 +703,13 @@ public class GameManager {
             // 장의사의 부검 결과 처리
             else if (user.getJob() instanceof Undertaker) {
                 if (user.isAlive()) {
-                    addPublicAnnouncement("장의사의 부검 결과, " + target.getName() + "님의 직업은 [" + target.getJob().getJobName() + "] 였습니다.");
+                    addPublicAnnouncement("장의사의 부검 결과, " + target.getName() + "님의 직업은 [" + target.getJob().getJobName() + "] 입니다.");
                 } else {
                     addPublicAnnouncement("장의사가 부검을 시도했으나 밤 사이 사망하여 부검 결과가 유실되었습니다.");
                 }
             }
         }
+        this.delayedNightActions.clear();
     }
 
 	/**
@@ -729,11 +740,6 @@ public class GameManager {
 
 			while (true) {
 	            Player votedPlayer = ui.promptForPlayerSelection(voter, "투표할 대상을 선택하세요.", getAllPlayers(), false, this);
-
-	            if (votedPlayer != null && votedPlayer.equals(voter)) {
-	                ui.displayPrivateMessage(voter, "자기 자신에게는 투표할 수 없습니다. 다시 선택해주세요.");
-	                continue;
-	            }
 	            
 	            // 유효성 검사 통과
 	            if (votedPlayer != null) {
@@ -844,36 +850,40 @@ public class GameManager {
 	 * 
 	 * @param executedPlayer 추방될 플레이어
 	 */
-	private void processExecution(Player executedPlayer) {
-		ui.displayPublicMessage(executedPlayer.getName() + "님이 추방되어 게임에서 탈락합니다.");
-		// executedPlayer.die();
-		// die()는 사망 메시지까지 출력하므로, 여기서는 상태만 변경하거나 메시지 조정
+    private void processExecution(Player executedPlayer) {
+		ui.displaySystemMessage(executedPlayer.getName() + "님이 추방되어 게임에서 탈락합니다.");
 
 		// 테러리스트 능력 확인 및 처리
 		if (executedPlayer.getJob() instanceof Terrorist && executedPlayer.isAlive()) {
-			// TODO Terrorist 클래스에 selectTargetForTerror(List<Player> livingPlayers,
-			// GameManager gm) 같은 메서드 필요
-			// 임시로 로직 구현
 			ui.displayPublicMessage(executedPlayer.getName() + "님은 테러리스트입니다! 동반 탈락할 대상을 선택합니다.");
-			List<Player> terrorTargets = new ArrayList<>(getLivingPlayers());
-			terrorTargets.remove(executedPlayer); // 자신 제외
-
-			if (!terrorTargets.isEmpty()) {
-				Player terrorTarget = ui.promptForPlayerSelection(executedPlayer, "동반 탈락시킬 대상의 번호를 입력하세요:", terrorTargets, false, this);
+			
+			while (true) {
+				Player terrorTarget = ui.promptForPlayerSelection(executedPlayer, "동반 탈락시킬 대상의 번호를 입력하세요:", getAllPlayers(), false, this);
                 
+                // 유효성 검사 1: 아무도 선택하지 않은 경우
+                if (terrorTarget == null) {
+                    ui.displayPublicMessage("테러리스트가 테러를 포기했습니다.");
+                    break;
+                }
+                
+                // 유효성 검사 2: 자기 자신을 선택한 경우
+                if (terrorTarget.equals(executedPlayer)) {
+                    ui.displayPrivateMessage(executedPlayer, "자기 자신은 선택할 수 없습니다. 다시 선택해주세요.");
+                    continue;
+                }
+
+                // 유효성 검사 통과
                 ui.displayPublicMessage(executedPlayer.getName() + "님의 테러로 " + terrorTarget.getName() + "님이 함께 탈락합니다!");
                 terrorTarget.die();
 				
 				if (terrorTarget.getJob().getInitialTeam() == Team.MAFIA) {
-					ui.displayPublicMessage(terrorTarget.getName() + "님의 직업은 [마피아]였습니다.");
+					ui.displayPublicMessage(terrorTarget.getName() + "님의 직업은 [" + terrorTarget.getJob().getJobName() + "]였습니다.");
 				}
-			} else {
-				ui.displayPublicMessage("테러할 대상이 없습니다.");
+                break;
 			}
 		}
 
-		executedPlayer.die(); // 추방된 플레이어 최종 사망 처리
-		// 추방된 플레이어의 직업은 비공개 (룰에 따름)
+		executedPlayer.die();
 	}
 
 	/**
@@ -882,25 +892,103 @@ public class GameManager {
 	 * @return 게임이 종료되었으면 true, 아니면 false
 	 */
 	private boolean checkWinConditions() {
-		// TODO: 룰에 정의된 각 팀의 승리 조건 판정 로직 구현
-		// 1. 생존한 각 팀 인원수 계산 (마피아팀, 시민팀, 간첩팀)
-		// 2. 마피아팀 승리 조건 확인 (정치인/건달 패널티 포함)
-		// 3. 시민팀 승리 조건 확인 (클래식/간첩 모드별)
-		// 4. 간첩팀 승리 조건 확인
-		// 5. 승리팀 발생 시 isGameOver = true, winningTeam 설정. 승리 우선순위 적용.
+		List<Player> livingPlayers = getLivingPlayers();
+		if (livingPlayers.isEmpty()) {
+			// 아무도 살아남지 않았다면 무승부 또는 특정 규칙에 따라 처리 가능
+			// 현재는 간첩팀 승리 조건에서 처리되므로, 여기까지 오면 무승부로 간주
+			return false;
+		}
 
-		// 임시 로직: 모든 마피아가 죽으면 시민 승리 (매우 단순화)
-		// List<Player> livingMafia = players.stream()
-		// .filter(p -> p.isAlive() && p.getCurrentTeam() == Team.MAFIA)
-		// .collect(Collectors.toList());
-		// if (livingMafia.isEmpty() && players.stream().anyMatch(p -> p.isAlive() &&
-		// p.getCurrentTeam() == Team.CITIZEN)) {
-		// winningTeam = Team.CITIZEN;
-		// isGameOver = true;
-		// currentPhase = GamePhase.GAME_OVER;
-		// return true;
-		// }
-		return false; // 임시 반환
+		// --- 1. 승리 조건 계산을 위한 데이터 수집 ---
+		int livingMafiaTeamCount = 0;    // 마피아 '팀' 전체 인원 (접선 여부 무관)
+		int livingCitizenTeamCount = 0;  // 시민 '팀' 전체 인원
+		int livingSpyTeamCount = 0;      // 간첩 '팀' 전체 인원
+
+		int livingPoliticianCount = 0;   // 생존한 정치인 수 (팀 무관)
+		int livingGangsterCount = 0;     // 생존한 건달 수 (팀 무관)
+		
+		int realMafiaThreatCount = 0;    // '실질적 위협'이 되는 마피아 팀원 수 (마피아 + 접선한 보조)
+		boolean originalSpyIsAlive = false; // 원래 '간첩' 직업 플레이어 생존 여부
+
+		for (Player p : livingPlayers) {
+			// 팀별 인원수 집계
+			switch (p.getCurrentTeam()) {
+				case MAFIA: livingMafiaTeamCount++; break;
+				case CITIZEN: livingCitizenTeamCount++; break;
+				case SPY: livingSpyTeamCount++; break;
+			}
+
+			// 정치인/건달 수 집계
+			if (p.getJob() instanceof Politician) livingPoliticianCount++;
+			if (p.getJob() instanceof Gangster) livingGangsterCount++;
+
+			// 원래 '간첩' 생존 여부 확인
+			if (p.getJob() instanceof Spy) originalSpyIsAlive = true;
+
+			// '실질적 위협' 마피아 팀원 수 집계
+			if (p.getJob() instanceof Mafia) {
+				realMafiaThreatCount++;
+			} else if (p.getJob() instanceof Informant) {
+				if (((Informant) p.getJob()).hasContacted()) realMafiaThreatCount++;
+			} else if (p.getJob() instanceof Warewolf) {
+				if (((Warewolf) p.getJob()).hasContacted()) realMafiaThreatCount++;
+			}
+		}
+
+		// --- 2. 승리 조건 판정 (우선순위: 마피아 > 시민 > 간첩) ---
+
+		// [조건 1] 마피아 팀 승리 조건 (클래식, 간첩 모드 공통)
+		// 2 * (실질적 위협 수) >= (전체 생존자 수 + 정치인/건달 가중치)
+		if (livingMafiaTeamCount > 0 && (2 * realMafiaThreatCount >= livingPlayers.size() + livingPoliticianCount + livingGangsterCount)) {
+			this.winningTeam = Team.MAFIA;
+			this.currentPhase = GamePhase.GAME_OVER;
+			return true;
+		}
+
+		// [조건 2] 시민 팀 승리 조건
+		if (this.gameMode == GameMode.CLASSIC) {
+			// 클래식 모드: 실질적 위협이 모두 제거되면 승리
+			if (realMafiaThreatCount == 0) {
+				this.winningTeam = Team.CITIZEN;
+				this.currentPhase = GamePhase.GAME_OVER;
+				return true;
+			}
+		} else {
+			// 간첩 모드: 실질적 위협 AND 원래 간첩 모두 제거 후, 간첩 팀보다 세력이 강하면 승리
+			int citizenTeamPower = livingCitizenTeamCount;
+			int spyTeamPower = livingSpyTeamCount;
+			// 정치인/건달 가중치 추가
+			for(Player p : livingPlayers) {
+				if(p.getJob() instanceof Politician || p.getJob() instanceof Gangster) {
+					if(p.getCurrentTeam() == Team.CITIZEN) citizenTeamPower++;
+					else if (p.getCurrentTeam() == Team.SPY) spyTeamPower++;
+				}
+			}
+
+			if (realMafiaThreatCount == 0 && !originalSpyIsAlive && citizenTeamPower >= spyTeamPower) {
+				this.winningTeam = Team.CITIZEN;
+				this.currentPhase = GamePhase.GAME_OVER;
+				return true;
+			}
+		}
+
+		// [조건 3] 간첩 팀 승리 조건 (간첩 모드 전용)
+		if (this.gameMode == GameMode.SPY) {
+			// 조건 3-1: 삼파전 승리
+			boolean condition1 = (livingCitizenTeamCount == 0 && livingSpyTeamCount >= livingMafiaTeamCount);
+			// 조건 3-2: 숙적 제거 후 승리
+			boolean condition2 = (livingMafiaTeamCount == 0 && originalSpyIsAlive && livingSpyTeamCount >= livingCitizenTeamCount);
+			// 조건 3-3: 최후의 승자
+			boolean condition3 = (livingMafiaTeamCount == 0 && livingCitizenTeamCount == 0 && livingSpyTeamCount > 0);
+
+			if (condition1 || condition2 || condition3) {
+				this.winningTeam = Team.SPY;
+				this.currentPhase = GamePhase.GAME_OVER;
+				return true;
+			}
+		}
+		
+		return false;
 	}
 
 	/**
@@ -908,14 +996,14 @@ public class GameManager {
 	 */
 	private void announceWinner() {
 		if (winningTeam != null) {
-			ui.displayPublicMessage("\n===================================");
-			ui.displayPublicMessage("         게임 종료! 승리: " + winningTeam + " 팀!");
-			ui.displayPublicMessage("===================================");
+			ui.displayPublicMessage("============================================");
+			ui.displayPublicMessage("    게임 종료! 승리: " + winningTeam + " 팀!    ");
+			ui.displayPublicMessage("============================================");
 			// 추가적으로 최종 생존자 및 직업 공개 등을 할 수 있음
 		} else {
-			ui.displayPublicMessage("\n===================================");
-			ui.displayPublicMessage("         게임 종료! (무승부 또는 오류)"); // 이 경우는 거의 없음
-			ui.displayPublicMessage("===================================");
+			ui.displayPublicMessage("============================================");
+			ui.displayPublicMessage("           게임 종료! (무승부 또는 오류)           ");
+			ui.displayPublicMessage("============================================");
 		}
 	}
 
