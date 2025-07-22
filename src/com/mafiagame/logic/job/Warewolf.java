@@ -113,6 +113,6 @@ public class Warewolf extends Job {
         }
         
         target.die();
-        gameManager.addPublicAnnouncement(user.getName() + "의 살육으로 " + target.getName() + "님이 끔찍하게 살해당했습니다!");
+        gameManager.addPublicAnnouncement("늑대인간의 살육으로 " + target.getName() + "님이 끔찍하게 살해당했습니다!");
     }
 }

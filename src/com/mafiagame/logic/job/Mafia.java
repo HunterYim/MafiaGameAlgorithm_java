@@ -62,45 +62,48 @@ public class Mafia extends Job {
 
     @Override
     public void performNightAction(Player self, List<Player> livingPlayers, GameManager gameManager) {
-    	String finalPrompt;
-    	
-    	// 1. 공격수일 경우, 동료들의 지명 현황을 확인
+        // 1. 역할에 맞는 프롬프트 생성
+        String basePrompt;
         if (isAttackCommander(self, gameManager)) {
-            Map<Player, Player> nominations = gameManager.getMafiaNominations();
-            StringBuilder promptBuilder = new StringBuilder(getNightActionPrompt(self, gameManager));
-            
-            if (!nominations.isEmpty()) {
-                promptBuilder.append("\n[동료 지명 현황]");
-                for (Map.Entry<Player, Player> entry : nominations.entrySet()) {
-                    promptBuilder.append("\n- ").append(entry.getKey().getName()).append(" -> ").append(entry.getValue().getName());
-                }
-            } else {
-                promptBuilder.append("\n(아직 동료의 지명이 없습니다)");
-            }
-            finalPrompt = promptBuilder.toString();
-        
-        // 2. 공격수가 아닐 경우 (지명자), 기본 안내 메시지 사용
+            basePrompt = "당신은 오늘 밤의 공격권자입니다. 공격할 대상을 선택하세요.";
         } else {
-            finalPrompt = getNightActionPrompt(self, gameManager);
+            basePrompt = "당신은 공격권이 없습니다. 추천할 대상을 선택하세요.";
         }
-
-        // 3. UI를 통해 대상 선택 입력받기
-        
-
-        
-        Player target = gameManager.getPlayerInputForNightAction(self, finalPrompt, gameManager.getAllPlayers(), false);
-        
-        if (target == null) return;
-        
-        // 4. 역할에 따라 다른 기록 메서드 호출
-        if (isAttackCommander(self, gameManager)) {
-            // 공격수는 최종 공격 대상을 기록 (applyNightEffect에서 사용됨)
-            gameManager.recordNightAbilityTarget(self, target);
+        Map<Player, Player> nominations = gameManager.getMafiaNominations();
+        StringBuilder promptBuilder = new StringBuilder(basePrompt);
+        if (!nominations.isEmpty()) {
+            promptBuilder.append("\n[동료 지명 현황]");
+            for (Map.Entry<Player, Player> entry : nominations.entrySet()) {
+                promptBuilder.append("\n- ").append(entry.getKey().getName()).append(" -> ").append(entry.getValue().getName());
+            }
         } else {
-            // 지명자는 실시간 지명 기록에 추가
-            gameManager.recordMafiaNomination(self, target);
-            // 동시에, 탐정의 '추리' 등을 위해 '능력을 사용했다'는 사실 자체는 기록해줌
-            gameManager.recordNightAbilityTarget(self, target);
+            promptBuilder.append("\n(아직 동료의 지명이 없습니다)");
+        }
+        String finalPrompt = promptBuilder.toString();
+
+        // 2. 유효성 검사 루프 추가 및 필터링 제거 
+        while (true) {
+            Player target = gameManager.getPlayerInputForNightAction(self, finalPrompt, gameManager.getAllPlayers(), false);
+            
+            // Case 1: 아무도 선택하지 않은 경우 루프 종료
+            if (target == null) {
+                break;
+            }
+
+            // Case 2: 유효성 검사 - 자기 자신을 선택했는지 확인
+            if (target.equals(self)) {
+                gameManager.getUi().displayPrivateMessage(self, "자기 자신은 공격/지명할 수 없습니다. 다시 선택해주세요.");
+                continue; // 다시 선택하도록 루프를 계속 진행
+            }
+            
+            // Case 3: 유효성 검사를 통과한 경우, 행동을 기록하고 루프 종료
+            if (isAttackCommander(self, gameManager)) {
+                gameManager.recordNightAbilityTarget(self, target);
+            } else {
+                gameManager.recordMafiaNomination(self, target);
+                gameManager.recordNightAbilityTarget(self, target);
+            }
+            break;
         }
     }
 
